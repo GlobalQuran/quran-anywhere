@@ -49,9 +49,10 @@
 		this.each(function() {
 			var total = $(this).children("li").length;
 			var limit = $(this).attr('items');
+	
 			if (total > limit) {
-				$(this).children("li:first").before('<div class="sf-scroll-up"><div class="sf-noarrow"></div></div>');
-				$(this).children("li:last").after('<div class="sf-scroll-dn"><div class="sf-dnarrow"></div></div>');
+				$(this).children("li:first").before('<div class="sf-scroll up"><i class="icon-caret-up"></i></div>');
+				$(this).children("li:last").after('<div class="sf-scroll dn"><div class="icon-caret-down"></div></div>');
 			}
 			$(this).children("li").reverse().each(function() {
 				if (--total >= limit)
@@ -77,7 +78,7 @@
 			});
 		});
 
-		$('.sf-scroll-up').hover(
+		$('.sf-scroll.up').hover(
 			function() { 
 				scroll = true;  // continue while hover is in effect
 				var $$ = $(this);
@@ -92,14 +93,14 @@
 					mv($$.parent().find('> li').reverse());
 					// Show other arrow when scrolling becomes possible for it
 					if ($$.parent().find("> li:last:visible").length <= 0)
-						$$.parent().find('div.sf-scroll-dn > div').toggleClass('sf-dnarrow', true).toggleClass('sf-noarrow', false);
+						$$.parent().find('div.sf-scroll.dn > div').toggleClass('sf-dnarrow', true).toggleClass('sf-noarrow', false);
 					setTimeout(function(){up();}, i);
 				}
 				up(); 
 			},
 			function() { scroll = false; /* stop scroll when hover ends */ }
 		);
-		$('.sf-scroll-dn').hover(
+		$('.sf-scroll.dn').hover(
 			function() { 
 				scroll = true;  // continue while hover is in effect
 				var $$ = $(this);
@@ -114,7 +115,7 @@
 					mv($$.parent().find('> li'));
 					// Show other arrow when scrolling becomes possible for it
 					if ($$.parent().find("> li:first:visible").length <= 0)
-						$$.parent().find('div.sf-scroll-up > div').toggleClass('sf-uparrow', true).toggleClass('sf-noarrow', false);
+						$$.parent().find('div.sf-scroll.up > div').toggleClass('sf-uparrow', true).toggleClass('sf-noarrow', false);
 					setTimeout(function(){dn();}, i);
 				}
 				dn();
