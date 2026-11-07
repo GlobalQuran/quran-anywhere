@@ -11,17 +11,32 @@ Copy two lines of HTML. No account, no API key, no build, no server.
 
 <br>
 
-<img src="docs/screenshots/day-desktop.jpg" alt="Quran Anywhere reading Ayat al-Kursi: mushaf script with tajweed colours and the English translation" width="880">
+<img src="docs/screenshots/hero-day.jpg" alt="Surah Al-Alaq from 'Iqra': mushaf script with tajweed colours, transliteration and three translations (English, Urdu, French)" width="880">
 
-</div>
+<sub>Surah Al-Alaq from "Iqra": tajweed colours, transliteration, and three translations at once</sub>
+
+<br>
 
 <table>
 <tr>
-<td width="33%" align="center"><img src="docs/screenshots/night-desktop.jpg" alt="Night theme, verse by verse with translation and transliteration"><br><sub><b>Night theme</b> · verse by verse, with translation</sub></td>
-<td width="33%" align="center"><img src="docs/screenshots/mobile.jpg" alt="Reading view on a phone" width="240"><br><sub><b>Phone</b> · flowing mushaf page</sub></td>
-<td width="33%" align="center"><img src="docs/screenshots/listen.jpg" alt="Listen view on a phone" width="240"><br><sub><b>Listen</b> · one verse at a time, recited</sub></td>
+<td width="50%" align="center"><img src="docs/screenshots/night-verse.jpg" alt="Night theme, verse by verse"><br><sub><b>Night</b> · verse by verse, several languages</sub></td>
+<td width="50%" align="center"><img src="docs/screenshots/reading-day.jpg" alt="Reading view like a printed mushaf page, day"><br><sub><b>Reading view</b> · a flowing mushaf page</sub></td>
+</tr>
+<tr>
+<td colspan="2" align="center"><img src="docs/screenshots/reading-night.jpg" alt="Reading view, night" width="640"><br><sub><b>Reading view at night</b></sub></td>
 </tr>
 </table>
+
+<table>
+<tr>
+<td align="center"><img src="docs/screenshots/phone-verse.jpg" alt="Phone, verse by verse with translations" width="190"><br><sub>Phone · verse by verse</sub></td>
+<td align="center"><img src="docs/screenshots/phone-reading-night.jpg" alt="Phone, reading view at night" width="190"><br><sub>Phone · reading, night</sub></td>
+<td align="center"><img src="docs/screenshots/phone-listen-day.jpg" alt="Phone, Listen view by day" width="190"><br><sub>Listen · day</sub></td>
+<td align="center"><img src="docs/screenshots/phone-listen-night.jpg" alt="Phone, Listen view at night" width="190"><br><sub>Listen · night</sub></td>
+</tr>
+</table>
+
+</div>
 
 ---
 
@@ -116,7 +131,7 @@ Set these in a `<script>` **before** `app.js` (or pass them as `?query` paramete
 | `window.GQ_URLS = "hash" \| "path" \| "off"` | How the place is written in the address bar. `hash` (`#2:255`) works on any host and is the default. `path` (`/2:255`) needs the host to serve `index.html` for every path (see below). `off` leaves the address alone. Also `?urls=` or `<meta name="gq-urls" content="path">`. |
 | `window.GQ_BASE = "/quran/"` | Folder the app lives in, for path links. Worked out automatically if not set. |
 | `window.GQ_TRANSLATIONS = "en.sahih,ur.jalandhry"` | Default translations for a visitor's **first** visit (their own choice wins afterwards). |
-| `window.GQ_API_KEY = "…"` | Your API key, if you have one (`?key=`). The API answers without one today. |
+| `window.GQ_API_KEY = "…"` | Your API key, if you have one (`?key=`). |
 | `window.GQ_API_URL = "…"` | Use another API base (`?api=`). |
 | `window.GQ_ASSETS = "…"` | Where mushaf glyph data and page fonts load from (default: the Global Quran CDN). |
 
