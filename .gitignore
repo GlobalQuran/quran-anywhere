@@ -1,0 +1,12 @@
+.DS_Store
+__pycache__/
+*.pyc
+.idea*
+.obsidian
+.claude
+node_modules/
+.deploy/
+
+# mushaf glyph data + page fonts (large) are hosted on the CDN; a local copy, if you make one, is not committed
+data/qcf/
+fonts/qcf/

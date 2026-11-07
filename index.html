@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, viewport-fit=cover">
+<title>Global Quran</title>
+<script>
+/* Links like /2:255, /37, /quran-uthmani+en.sahih/2:255 (the older GlobalQuran.com formats) are served by this one page. Resources are relative, so the
+   page needs a <base> pointing at the folder the app lives in; a host with the app in a sub-folder can set window.GQ_BASE (e.g. "/quran/") first. */
+(function () {
+  /* edition ids look like en.sahih / quran-uthmani, so a folder called "quran" or "app" is never mistaken for one; the app can sit at any depth */
+  var base = window.GQ_BASE, m = /^(.*?\/)((?:(?:[a-z]{2,3}\.[\w\-]+|quran-[\w\-]+)(?:\+(?:[a-z]{2,3}\.[\w\-]+|quran-[\w\-]+))*\/)?(?:\d{1,3}(?::\d{1,3})?|search\/.*)\/?)$/i.exec(location.pathname);
+  if (!base && m) base = m[1];
+  if (base) document.write('<base href="' + base + '">');
+}());
+</script>
+<script>
+/* Backward compatibility: the older app's settings file (gq.setConfig(config); gq.start(); gq.quran.add("id")) is accepted. app.js reads what it hands over. */
+window.gq = window.gq || { _quran: [], setConfig: function (c) { window.GQ_LEGACY = c || {}; }, start: function () {}, quran: { add: function (id) { window.gq._quran.push(id); }, reset: function () { window.gq._quran = []; } } };
+</script>
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="img/icons/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="img/icons/favicon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="img/icons/apple-touch-icon.png">
+<link rel="manifest" href="site.webmanifest">
+<meta name="theme-color" content="#1a2224">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Global Quran">
+<link rel="stylesheet" href="app.css?v=67">
+</head>
+<body>
+<a class="skip" id="skip" href="#">Skip to the Quran text</a>
+<div class="sr" id="sr" role="status" aria-live="polite" aria-atomic="true"></div>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><filter id="fTeal" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values=".1854 .3639 .0707 0 0  .2213 .4344 .0844 0 0  .2213 .4344 .0844 0 0  0 0 0 1 0"/></filter></svg>
+
+<div class="app" id="app">
+
+  <!-- ============ left sidebar: surahs, bookmarks, settings ============ -->
+  <aside class="side" id="side" aria-label="Menu">
+    <a class="brand" href="./" aria-label="Global Quran home">
+      <svg class="brand-mark"><use href="img/sprite.svg#mark"/></svg>
+      <span class="brand-txt"><span class="brand-ar">العالمي</span><span class="brand-en">GLOBAL QURAN</span></span>
+    </a>
+    <div class="side-tabs" role="tablist">
+      <button role="tab" data-tab="surahs" class="on"><svg><use href="img/sprite.svg#i-lib"/></svg>Surahs</button>
+      <button role="tab" data-tab="marks"><svg><use href="img/sprite.svg#i-star"/></svg>Saved</button>
+      <button role="tab" data-tab="settings"><svg><use href="img/sprite.svg#i-gear"/></svg>Settings</button>
+    </div>
+    <div class="side-body">
+      <section class="tab on" id="tab-surahs">
+        <label class="sfield"><svg><use href="img/sprite.svg#i-search"/></svg><input type="search" id="surahFilter" placeholder="Search surah or number" autocomplete="off"></label>
+        <ul class="surah-list" id="surahList"></ul>
+      </section>
+      <section class="tab" id="tab-marks"><ul class="mark-list" id="markList"></ul></section>
+      <section class="tab" id="tab-settings">
+        <div class="set"><span>Translations</span><button class="set-btn" id="optTrBtn" type="button">…</button></div>
+        <label class="set"><span>Arabic size</span><input type="range" id="optAr" min="22" max="52" step="1"></label>
+        <label class="set"><span>Translation size</span><input type="range" id="optTrSize" min="13" max="26" step="1"></label>
+        <label class="set"><span>Layout</span><select id="optLayout"><option value="auto">Automatic</option><option value="stacked">Arabic above translation</option><option value="side">Side by side</option></select></label>
+        <label class="set"><span>Arabic font</span><select id="optFont"><option value="mushaf">Mushaf (Madani page)</option><option value="amiri">Amiri Quran</option><option value="kfc">KFC Naskh</option><option value="me">Me Quran</option></select></label>
+        <label class="set"><span>Theme</span><select id="optTheme"><option value="day">Day</option><option value="night">Night</option><option value="auto">Match system</option></select></label>
+        <label class="set"><span>Quran reciter</span><select id="optReciter"></select></label>
+        <label class="set"><span>Translation reciter</span><select id="optTrRec"></select></label>
+        <label class="set"><span>Audio speed</span><select id="optSpeed"><option value="0.75">0.75×</option><option value="1">1×</option><option value="1.25">1.25×</option><option value="1.5">1.5×</option></select></label>
+        <label class="set chk"><input type="checkbox" id="optTajweed"><span>Colour the tajweed rules</span></label>
+        <label class="set chk"><input type="checkbox" id="optWbw"><span>Word by word: meaning when you hover or tap a word</span></label>
+        <label class="set chk"><input type="checkbox" id="optTlit"><span>Show transliteration under the Arabic</span></label>
+        <label class="set chk"><input type="checkbox" id="optCredit"><span>Show translator name under every verse</span></label>
+        <label class="set chk"><input type="checkbox" id="optFollow"><span>Scroll along while audio plays</span></label>
+        <label class="set chk" id="setStats" hidden><input type="checkbox" id="optStats"><span>Share anonymous usage statistics · <a href="#" id="statsMore">details</a></span></label>
+        <div class="set-h">Tajweed key</div>
+        <ul class="legend" id="legend"></ul>
+      </section>
+    </div>
+    <div class="side-foot"><a href="https://globalquran.com" target="_blank" rel="noopener">GlobalQuran.com</a> · © 2006–<span id="yr">2026</span></div>
+  </aside>
+  <div class="scrim" id="scrim"></div>
+
+  <!-- ============ main column ============ -->
+  <section class="main" role="main" aria-label="Quran reader">
+
+
+    <div class="reader" id="reader">
+      <img class="arabesque" src="img/arabesque.webp" alt="">
+      <div class="book" id="book">
+      <article class="paper" id="paper">
+        <div class="frame" aria-hidden="true"><i class="mf-t"></i><i class="mf-b"></i><i class="mf-l"></i><i class="mf-r"></i><i class="mf-tl"></i><i class="mf-tr"></i><i class="mf-bl"></i><i class="mf-br"></i></div>
+        <header class="phead" id="phead">
+          <button class="hbtn" id="btnMenu" aria-label="Toggle menu" aria-expanded="true"><svg><use href="img/sprite.svg#i-menu"/></svg></button>
+          <div class="cartwrap"><div class="cart" id="cart">
+            <img src="img/title_border@4x.webp" alt="">
+            <button class="cz cz-l" id="btnPrevS" aria-label="Previous surah" title="Previous surah"></button>
+            <button class="cz cz-m" id="cartBtn" aria-haspopup="dialog" aria-expanded="false" aria-controls="picker" title="Choose a surah"><b class="sn" id="cartName" role="heading" aria-level="1"></b><b class="cart-saved" id="cartSaved">Saved</b></button>
+            <button class="cz cz-r" id="btnNextS" aria-label="Next surah" title="Next surah"></button>
+          </div></div>
+          <div class="hgrp">
+            <button class="hbtn" id="btnTheme" aria-label="Day / night"><svg><use href="img/sprite.svg#i-moon"/></svg></button>
+            <button class="hbtn" id="btnTools" aria-label="Reading options" aria-expanded="false" aria-controls="tools"><svg><use href="img/sprite.svg#i-gear"/></svg></button>
+          </div>
+        </header>
+        <div class="scroll" id="scroll" tabindex="0" aria-label="Surah text"><div class="inner" id="inner"></div></div>
+        <div class="svscroll" id="svscroll" tabindex="0" aria-label="Saved ayahs" hidden><div class="inner" id="svinner"></div></div>
+        <div class="fade fade-t"></div><div class="fade fade-b"></div>
+        <button type="button" class="ls-b ls-fs fs-btn" id="fsBtn" aria-label="Focus view" title="Focus view"><svg viewBox="0 0 24 24" class="i-s0"><rect x="3" y="6" width="18" height="12" rx="1.5"/><rect x="8" y="9.5" width="8" height="5" rx=".8"/></svg>
+              <svg viewBox="0 0 24 24" class="i-s1"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+              <svg viewBox="0 0 24 24" class="i-s2"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg></button>
+        <!-- Listen view: one verse at a time, fading in as it is recited, over a slow geometric animation (see "Listen view" in app.js) -->
+        <div class="lstage" id="lstage" hidden>
+          <canvas class="ls-canvas" id="lsCanvas" aria-hidden="true"></canvas>
+          <div class="ls-in">
+            <div class="ls-ref" id="lsRef"></div>
+            <div class="ls-body" id="lsBody"><div class="ls-text" id="lsText" aria-live="polite"></div></div>
+            <div class="ls-voice" id="lsVoice" title=""><i class="ls-eq"><b></b><b></b><b></b></i><span id="lsVoiceT"></span></div>
+          </div>
+          <div class="ls-ctl">
+            <button type="button" id="lsPrev" class="ls-b" aria-label="Previous verse"><svg><use href="img/sprite.svg#i-skipb"/></svg></button>
+            <button type="button" id="lsPlay" class="ls-b ls-big" aria-label="Play"><svg><use href="img/sprite.svg#i-play"/></svg></button>
+            <button type="button" id="lsNext" class="ls-b" aria-label="Next verse"><svg><use href="img/sprite.svg#i-skipf"/></svg></button>
+            <button type="button" id="lsFs" class="ls-b ls-fs" aria-label="Focus view" title="Focus view">
+              <svg viewBox="0 0 24 24" class="i-s0"><rect x="3" y="6" width="18" height="12" rx="1.5"/><rect x="8" y="9.5" width="8" height="5" rx=".8"/></svg>
+              <svg viewBox="0 0 24 24" class="i-s1"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+              <svg viewBox="0 0 24 24" class="i-s2"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg>
+            </button>
+          </div>
+          <div class="ls-paused" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="6" y="5" width="4" height="14" rx="1.2"/><rect x="14" y="5" width="4" height="14" rx="1.2"/></svg><span>Paused</span></div>
+        </div>
+        <!-- reading modes: a note pinned on the book (landing page, or from the gear); built from MODES in app.js -->
+        <div class="modes" id="modes" role="region" aria-labelledby="modesT" hidden>
+          <i class="modes-tape" aria-hidden="true"></i>
+          <button type="button" class="icon-btn modes-x" id="modesX" aria-label="Close"><svg><use href="img/sprite.svg#i-close"/></svg></button>
+          <h2 class="modes-h" id="modesT">How would you like to read today?</h2>
+          <p class="modes-note">Each mode sets the page up differently: which view you see, whether the translation shows, and whether audio plays. You can change any of it afterwards in the options.</p>
+          <div class="modes-chips" id="modesChips"></div>
+          <div class="modes-sub" id="modesSub" hidden></div>
+        </div>
+        <!-- keyboard shortcuts: built from SHORTCUTS in app.js -->
+        <div class="kbd" id="kbd" role="dialog" aria-modal="true" aria-labelledby="kbdT" hidden>
+          <div class="kbd-card">
+            <div class="kbd-h"><h2 id="kbdT">Keyboard shortcuts</h2><button type="button" class="icon-btn" id="kbdClose" aria-label="Close shortcuts"><svg><use href="img/sprite.svg#i-close"/></svg></button></div>
+            <div class="kbd-body" id="kbdBody" tabindex="0"></div>
+            <p class="kbd-foot">Shortcuts don't work while you are typing in a box. Press <kbd class="kc kc-s">?</kbd> any time to open this list.</p>
+          </div>
+        </div>
+        <!-- usage statistics: a quiet card (only where consent is needed) and a short explanation; both live inside the page frame, shown only on globalquran.com (see analytics.js) -->
+        <div class="cookie" id="cookie" role="region" aria-label="Usage statistics" hidden>
+          <span>Allow anonymous usage statistics to help improve this reader?</span>
+          <span class="ck-b"><button type="button" id="ckAllow">Allow</button><button type="button" id="ckNo">No thanks</button><a href="#" id="ckMore">Details</a></span>
+        </div>
+        <div class="privacy" id="privacy" role="dialog" aria-label="Privacy" hidden>
+          <div class="pr-card">
+            <h2>Privacy</h2>
+            <p>We use Google Analytics to count visits and to see which features are used (for example which surahs are opened, whether audio is played, and which settings are changed), so we can improve the reader.</p>
+            <p>It stores a small cookie on this site, is never used for advertising, and never records what you type, your list of saved verses, or anything that identifies you. It does note which verses are saved, copied or played (not by whom), so we can see which verses are the most loved. You can change your mind at any time, here or in Settings.</p>
+            <p class="pr-state" id="prState"></p>
+            <div class="oops-btns"><button class="oops-btn pri" id="prToggle" type="button">Allow</button><button class="oops-btn" id="prClose" type="button">Close</button></div>
+          </div>
+        </div>
+        <!-- shown inside the page frame, in place of its contents, when the service can't be reached or is failing (see down() in app.js) -->
+        <div class="oops" id="oops" role="alert" hidden>
+          <div class="oops-in">
+            <div class="oops-brand"><span>العالمي</span> GLOBAL QURAN</div>
+    <svg class="oops-art" viewBox="0 0 640 270" aria-hidden="true" focusable="false">
+              <defs>
+                <path id="frond" d="M0 0C26-36 74-40 116-4C76-22 32-16 0 0Z"/>
+                <radialGradient id="oSun"><stop offset="0" stop-color="var(--o-sun)" stop-opacity=".55"/><stop offset="1" stop-color="var(--o-sun)" stop-opacity="0"/></radialGradient>
+              </defs>
+              <g class="o-sky">
+                <circle class="o-glow" cx="470" cy="150" r="120" fill="url(#oSun)"/>
+                <circle class="o-sun" cx="470" cy="150" r="34"/>
+                <path class="o-moon" d="M470 112a38 38 0 1 0 22 70a30 30 0 1 1-22-70z"/>
+                <g class="o-stars"><circle cx="90" cy="46" r="2"/><circle cx="170" cy="92" r="1.6"/><circle cx="260" cy="38" r="2.2"/><circle cx="380" cy="70" r="1.6"/><circle cx="560" cy="48" r="2"/><circle cx="600" cy="120" r="1.5"/><circle cx="330" cy="120" r="1.4"/></g>
+              </g>
+              <path class="o-d3" d="M0 190C80 160 170 150 270 176C380 204 480 160 640 178V270H0Z"/>
+              <path class="o-d2" d="M0 214C110 188 210 196 320 214C430 232 520 196 640 206V270H0Z"/>
+              <path class="o-d1" d="M0 240C120 222 240 232 340 242C450 252 540 228 640 238V270H0Z"/>
+              <g class="o-palm" transform="translate(196 226)">
+                <path class="o-trunk" d="M0 0C-9-34 7-70-2-118" fill="none" stroke-width="11" stroke-linecap="round"/>
+                <path class="o-rings" d="M-6-18l9-2M-5-34l9-2M-2-50l9-2M-1-66l9-2M-1-82l9-2M-2-98l9-2" fill="none" stroke-width="2" stroke-linecap="round"/>
+                <g transform="translate(-2 -118)"><g class="o-crown">
+                  <use href="#frond" class="o-f" transform="rotate(-72)"/>
+                  <use href="#frond" class="o-f" transform="rotate(-38)"/>
+                  <use href="#frond" class="o-f" transform="rotate(-6)"/>
+                  <use href="#frond" class="o-f" transform="rotate(26)"/>
+                  <use href="#frond" class="o-f" transform="scale(-1 1) rotate(-72)"/>
+                  <use href="#frond" class="o-f" transform="scale(-1 1) rotate(-38)"/>
+                  <use href="#frond" class="o-f" transform="scale(-1 1) rotate(-6)"/>
+                  <use href="#frond" class="o-f" transform="scale(-1 1) rotate(26)"/>
+                  <g class="o-dates"><circle cx="-7" cy="9" r="4.2"/><circle cx="2" cy="12" r="4.2"/><circle cx="8" cy="7" r="4.2"/></g>
+                </g></g>
+              </g>
+              <path class="o-wind" d="M300 60h60M322 74h40M80 150h44M520 72h52" fill="none" stroke-width="2.2" stroke-linecap="round"/>
+            </svg>
+            <h1 id="oopsT"></h1>
+            <p id="oopsP"></p>
+            <div class="oops-btns"><button class="oops-btn pri" id="oopsRetry" type="button">Try again</button><button class="oops-btn" id="oopsBack" type="button" hidden>Go back to where I was</button></div>
+            <small id="oopsD"></small>
+          </div>
+        </div>
+        <div class="rhead" id="rhead"><button class="tr-chip" id="trChip" aria-haspopup="dialog" aria-expanded="false" aria-controls="trpick" title="Change translation"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3.4 3.6 3.4 14.4 0 18M12 3c-3.4 3.6-3.4 14.4 0 18"/></svg><span id="trChipName"></span><i>▾</i></button></div>
+        <div class="subhead" id="tools" role="region" aria-label="Reading options" hidden>
+          <div class="sh-in">
+            <div class="shf shf-mode"><span class="shf-lbl">Mode</span><button class="pbtn" id="btnModes" type="button" aria-haspopup="dialog" aria-label="Reading mode" title="Reading mode"><svg viewBox="0 0 24 24" class="mode-ic" aria-hidden="true"><rect x="4" y="4" width="6.5" height="6.5" rx="1.6"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.6"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.6"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.6"/></svg><span class="mode-t">Choose</span></button></div>
+            <div class="shf shf-view"><span>View</span><span class="seg" id="segView"><button data-v="verse" aria-pressed="true">Verse by verse</button><button data-v="read" aria-pressed="false">Reading</button><button data-v="listen" aria-pressed="false">Listen</button></span></div>
+            <div class="shf shf-rd"><span>Show</span><span class="seg" id="segRd"><button data-v="ar" aria-pressed="true">Arabic</button><button data-v="tr" aria-pressed="false">Translation</button></span></div>
+            <div class="shf shf-tj"><span>Tajweed</span><button class="pbtn" id="btnTajweed" aria-pressed="false">On</button></div>
+            <div class="shf shf-tlit"><span>Transliteration</span><select class="pselect" id="selTlit" aria-label="Transliteration"></select></div>
+            <div class="shf shf-size"><span>Text size</span><span class="pgrp"><button class="pbtn" id="btnSmaller" aria-label="Smaller text">A−</button><button class="pbtn" id="btnBigger" aria-label="Larger text">A+</button></span></div>
+          </div>
+          <button class="icon-btn sh-kb" id="btnKbd" aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)" aria-haspopup="dialog"><svg viewBox="0 0 24 24"><rect x="2.5" y="6" width="19" height="12" rx="2.2"/><path d="M6 10h.01M9.5 10h.01M13 10h.01M16.5 10h.01M6 13.8h.01M18 13.8h.01M9 14h6"/></svg></button>
+          <button class="icon-btn sh-x" id="btnToolsX" aria-label="Close options"><svg><use href="img/sprite.svg#i-close"/></svg></button>
+        </div>
+        <div class="pop trpick" id="trpick" role="dialog" aria-label="Translations" hidden>
+          <div class="tp-h"><b>Translations</b><span id="tpCount"></span><button class="icon-btn tp-x" id="tpX" aria-label="Close"><svg><use href="img/sprite.svg#i-close"/></svg></button></div>
+          <label class="psearch"><svg><use href="img/sprite.svg#i-search"/></svg><input type="search" id="tpFilter" placeholder="Search language or translator" autocomplete="off"></label>
+          <div class="tp-body" id="tpBody">
+            <button class="tp-none" id="tpNone" role="checkbox" aria-checked="false"><span class="cb"></span><span class="ti-t">No translation<small>Arabic only</small></span></button>
+            <div class="tp-chosen" id="tpChosen"></div>
+            <ul class="tplist" id="tpList"></ul>
+          </div>
+        </div>
+        <div class="pop voices" id="voices" role="dialog" aria-label="Voices and speed" hidden>
+          <div class="vc-h"><b>Voices</b><span id="vcSub">Quran first, then translation</span></div>
+          <label class="vc-row vc-ar"><span>Quran</span><select id="plReciter" aria-label="Quran reciter"></select></label>
+          <label class="vc-row vc-tr"><span>Translation</span><select id="plTrRec" aria-label="Translation reciter"></select></label>
+          <div class="vc-row"><span>Speed</span><span class="seg" id="plSpeedSeg"><button data-v="0.75">0.75×</button><button data-v="1">1×</button><button data-v="1.25">1.25×</button><button data-v="1.5">1.5×</button></span></div>
+        </div>
+        <div class="pop picker" id="picker" role="dialog" aria-label="Choose a surah" hidden>
+          <label class="psearch"><svg><use href="img/sprite.svg#i-search"/></svg><input type="search" id="pickFilter" placeholder="Search surah or number" autocomplete="off"></label>
+          <ul class="plist" id="pickList"></ul>
+        </div>
+        <div class="foot" id="foot">
+          <div class="foot-row" id="footRow">
+            <button class="listen" id="btnListen" aria-label="Play"><span class="lp"><svg><use href="img/sprite.svg#i-play"/></svg></span><span class="lt" id="listenT">Play</span></button>
+            <button class="tj-strip" id="btnKey" aria-expanded="false" aria-controls="tjKey" aria-label="Tajweed key" hidden></button>
+            <button class="tj-x" id="btnKeyHide" aria-label="Hide the tajweed key" title="Hide the key (turn tajweed off and on to bring it back)" hidden>×</button>
+          </div>
+          <section class="plp" id="player" aria-label="Audio player" hidden>
+            <div class="pl-btns">
+              <button class="pl-b" id="plPrev" aria-label="Previous ayah"><svg><use href="img/sprite.svg#i-skipb"/></svg></button>
+              <button class="pl-play" id="plPlay" aria-label="Play"><svg><use href="img/sprite.svg#i-play"/></svg></button>
+              <button class="pl-b" id="plNext" aria-label="Next ayah"><svg><use href="img/sprite.svg#i-skipf"/></svg></button>
+            </div>
+            <span class="pl-text"><b id="plSurah">—</b><small id="plSub"></small></span>
+            <div class="plp-opts">
+              <button class="vpill" id="plVoices" aria-label="Voices and speed" aria-haspopup="dialog" aria-expanded="false" aria-controls="voices" title="Voices and speed"></button>
+              <button class="pl-b" id="plRepeat" aria-label="Repeat" title="Repeat: off"><svg><use href="img/sprite.svg#i-repeat"/></svg><i class="rp" id="rpBadge"></i></button>
+              <button class="pl-b" id="plClose" aria-label="Close player"><svg><use href="img/sprite.svg#i-close"/></svg></button>
+            </div>
+            <div class="pl-bar" id="plBar" role="progressbar" aria-label="Ayah progress"><i id="plFill"></i></div>
+          </section>
+        </div>
+        <div class="tj-key" id="tjKey" role="dialog" aria-label="Tajweed key" hidden><div class="tj-key-h"><span>Tajweed key</span><button class="icon-btn" id="btnKeyX" aria-label="Close"><svg><use href="img/sprite.svg#i-close"/></svg></button></div><ul class="legend" id="legend2"></ul></div>
+      </article>
+
+      <!-- ayah ribbon: every ayah number; click to jump, drag to scrub -->
+      <nav class="ribbon" id="ribbon" aria-label="Ayahs">
+        <button class="rb-bm" id="btnSaved" aria-pressed="false" aria-label="Saved ayahs" title="Saved ayahs"><svg viewBox="0 0 24 24"><path d="M6.5 3.5h11v17l-5.5-4.2-5.5 4.2z"/></svg><i id="bmCount"></i></button>
+        <div class="rb-track" id="rbTrack" role="slider" tabindex="0" aria-label="Ayah" aria-valuemin="1">
+          <div class="rb-marks" id="rbMarks"></div>
+          <div class="rb-handle" id="rbHandle"><b id="rbNow"></b></div>
+        </div>
+        <div class="rb-tip" id="rbTip" hidden></div>
+      </nav>
+      </div>
+    </div>
+
+
+  </section>
+
+  <div class="tip" id="tip" role="tooltip" hidden></div>
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+</div>
+
+<audio id="audio" preload="none"></audio>
+<script src="gq-api.js?v=3"></script>
+<script src="analytics.js?v=2"></script>
+<script src="app.js?v=64"></script>
+<script src="site.js?v=8"></script>
+</body>
+</html>
