@@ -686,3 +686,13 @@ html.night #shareMenu .sh-card { background: #232b30; }
 html.night #shareMenu .sh-grid a, html.night #shareMenu .sh-grid button { background: rgba(255,255,255,.06); }
 #shareMenu .sh-grid a:hover, #shareMenu .sh-grid button:hover { border-color: var(--gold); }
 .actions svg[viewBox] { width: 16px; height: 16px; stroke: currentColor; stroke-width: 2; }
+
+/* verse menu in the reading view */
+#vpop { position: fixed; z-index: 58; min-width: 168px; padding: 8px; border-radius: 12px; background: var(--paper, #fffdf6); color: var(--head); border: 1px solid var(--line); box-shadow: 0 8px 28px rgba(0,0,0,.3); } #vpop[hidden] { display: none; }
+html.night #vpop { background: #232b30; }
+#vpop .vp-h { padding: 2px 8px 6px; font: 700 12px Arial, Helvetica, sans-serif; color: var(--cite); }
+#vpop .vp-b { display: grid; gap: 2px; }
+#vpop button { display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 10px; border: 0; border-radius: 8px; background: none; color: inherit; font: 600 14px Arial, Helvetica, sans-serif; text-align: left; cursor: pointer; }
+#vpop button:hover, #vpop button:focus-visible { background: rgba(165,138,58,.16); outline: none; }
+#vpop svg { width: 17px; height: 17px; flex: none; }
+.reading .vnum { cursor: pointer; }
