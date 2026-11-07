@@ -13,7 +13,7 @@
  *   data-translation any Global Quran translation id, e.g. en.sahih, fr.hamidullah, ur.jalandhry (several: "en.sahih,ur.jalandhry"), or none
  *   data-theme       day | night | auto (follows the visitor's system)      data-accent   hex colour, no #
  *   data-player      0 hides the audio player                               data-font     mushaf | amiri | me
- *   data-api-key     your Global Quran API key (optional: the API answers keyless today; if keys are ever enforced, put yours here)
+ *   data-api-key     your Global Quran API key (optional)
  *   data-api-url     use another API base URL (default https://api.globalquran.com)
  *
  * JavaScript API on the element:  el.globalquran.goto(36, 12)  .setTheme("night")  .setTranslation("en.sahih")  .play(5)  .pause()

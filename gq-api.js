@@ -4,8 +4,7 @@
 
    Configuration (all optional):
      window.GQ_API_URL   default https://api.globalquran.com        (or ?api=https://...)
-     window.GQ_API_KEY   sent as ?key=... only when set             (or ?key=...). The API accepts keyless requests today; if keys are
-                                                                     ever enforced, set the key here (site config / embed data-api-key).
+     window.GQ_API_KEY   sent as ?key=... only when set             (or ?key=...). Site config / embed data-api-key.
    Caching: lists are kept in localStorage for 24h and served stale while they refresh; surah text is kept in memory and IndexedDB. */
 window.GQ = (() => {
   "use strict";
