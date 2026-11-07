@@ -21,7 +21,7 @@
   const L = {
     quran: "https://GlobalQuran.com", salat: "https://MuslimSalat.com",
     docs: "https://docs.globalquran.com", donate: "https://docs.globalquran.com/donate", data: "https://docs.globalquran.com/data",
-    repo: "GlobalQuran/site", bugs: "https://github.com/GlobalQuran/site/issues", v2: "https://v2.globalquran.com",
+    repo: "GlobalQuran/quran-anywhere", bugs: "https://github.com/GlobalQuran/quran-anywhere/issues", v2: "https://v2.globalquran.com",
     about: "https://docs.globalquran.com/about", contact: "https://docs.globalquran.com/contact"
   };
   const VERSIONS = [["V4", "http://v4.globalquran.com/"], ["V3", "https://v3.globalquran.com/"], ["V2", "https://v2.globalquran.com/"]];   // earlier versions of the site (there is no V1)

@@ -644,6 +644,9 @@ html.night .mchip { background: rgba(255,255,255,.06); border-color: rgba(255,25
 .mchip.cur::after { content: ""; width: 6px; height: 6px; margin-top: 2px; border-radius: 50%; background: var(--gold); }
 .modes-sub { margin-top: 10px; display: grid; gap: 6px; animation: modes-sub .25s ease; } .modes-sub[hidden] { display: none; }
 @keyframes modes-sub { from { opacity: 0; transform: translateY(-4px); } }
+.msub-back { justify-self: start; display: inline-flex; align-items: center; gap: 4px; padding: 6px 10px 6px 6px; border: 0; background: none; color: var(--cite); font: 700 13px Arial, Helvetica, sans-serif; cursor: pointer; border-radius: 8px; } .msub-back:hover { background: rgba(165,138,58,.14); }
+.msub-back svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.msub-h { margin: 2px 0 2px; font: 700 15px Arial, Helvetica, sans-serif; }
 .msub { display: block; width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: rgba(255,255,255,.5); color: inherit; font: inherit; text-align: left; cursor: pointer; }
 html.night .msub { background: rgba(255,255,255,.05); border-color: rgba(255,255,255,.14); } .msub:hover { border-color: var(--gold); background: rgba(165,138,58,.12); }
 .msub b { display: flex; align-items: center; gap: 8px; font: 700 14px Arial, Helvetica, sans-serif; } .msub span { display: block; margin-top: 3px; font: 13px/1.45 Arial, Helvetica, sans-serif; color: var(--tr-ink); } html.night .msub span { color: #b9c1bf; }
@@ -669,3 +672,17 @@ html.ls-focus .modes { display: none; }
 /* a phone: too narrow to scroll sensibly, so it wraps into a few tidy rows and the keyboard button (no keyboard) goes */
 @container subhead (max-width: 560px) { .sh-in { flex-wrap: wrap; overflow: visible; gap: 6px 12px; padding-right: 0; } .sh-kb { display: none; }
   .sh-in > .shf-mode { order: 0; } .sh-in > .shf-tj { order: 1; } .sh-in > .shf-size { order: 2; } .sh-in > .shf-view { order: 3; } .sh-in > .shf-tlit { order: 4; } }
+.qcf .qe { cursor: pointer; }
+
+/* share menu (desktop fallback; phones get their own share sheet) */
+#shareMenu { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; } #shareMenu[hidden] { display: none; }
+#shareMenu .sh-back { position: absolute; inset: 0; background: rgba(0,0,0,.45); }
+#shareMenu .sh-card { position: relative; width: min(92vw, 380px); padding: 16px 18px 18px; border-radius: 14px; background: var(--paper, #fffdf6); color: var(--head); box-shadow: 0 10px 40px rgba(0,0,0,.35); border: 1px solid var(--line); }
+html.night #shareMenu .sh-card { background: #232b30; }
+#shareMenu .sh-h { display: flex; align-items: center; justify-content: space-between; gap: 8px; font: 700 15px Arial, Helvetica, sans-serif; }
+#shareMenu blockquote { margin: 12px 0; padding: 10px 12px; border-left: 3px solid var(--gold); font-size: 22px; line-height: 1.9; direction: rtl; max-height: 120px; overflow: auto; background: rgba(165,138,58,.08); border-radius: 6px; }
+#shareMenu .sh-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+#shareMenu .sh-grid a, #shareMenu .sh-grid button { display: flex; align-items: center; justify-content: center; height: 40px; border: 1px solid var(--line); border-radius: 20px; background: rgba(255,255,255,.5); color: inherit; font: 600 14px Arial, Helvetica, sans-serif; text-decoration: none; cursor: pointer; }
+html.night #shareMenu .sh-grid a, html.night #shareMenu .sh-grid button { background: rgba(255,255,255,.06); }
+#shareMenu .sh-grid a:hover, #shareMenu .sh-grid button:hover { border-color: var(--gold); }
+.actions svg[viewBox] { width: 16px; height: 16px; stroke: currentColor; stroke-width: 2; }

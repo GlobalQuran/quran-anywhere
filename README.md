@@ -2,35 +2,75 @@
 
 # Quran Anywhere
 
-**A complete Quran reader you can put on any website, in any app, in about a minute.**
+**A complete, beautiful Quran reader you can put on any website or app in about a minute.**<br>
+Copy two lines of HTML. No account, no API key, no build, no server.
 
-Mushaf script with tajweed colours · 95 translations in 41 languages · recitation audio · day and night · just a folder of static files
-
-[Live demo](https://globalquran.com) · [Embed demo](embed-demo.html) · [API docs](https://docs.globalquran.com) · [Open Quran data](https://github.com/GlobalQuran/data)
+[**Live demo**](https://globalquran.com) · [Embed demo](embed-demo.html) · [Quick start](#quick-start-in-a-minute) · [API docs](https://docs.globalquran.com) · [Open Quran data](https://github.com/GlobalQuran/data)
 
 <sub>by <a href="https://globalquran.com">Global Quran</a> · free and open source</sub>
 
+<br>
+
+<img src="docs/screenshots/day-desktop.jpg" alt="Quran Anywhere reading Ayat al-Kursi: mushaf script with tajweed colours and the English translation" width="880">
+
 </div>
+
+<table>
+<tr>
+<td width="33%" align="center"><img src="docs/screenshots/night-desktop.jpg" alt="Night theme, verse by verse with translation and transliteration"><br><sub><b>Night theme</b> · verse by verse, with translation</sub></td>
+<td width="33%" align="center"><img src="docs/screenshots/mobile.jpg" alt="Reading view on a phone" width="240"><br><sub><b>Phone</b> · flowing mushaf page</sub></td>
+<td width="33%" align="center"><img src="docs/screenshots/listen.jpg" alt="Listen view on a phone" width="240"><br><sub><b>Listen</b> · one verse at a time, recited</sub></td>
+</tr>
+</table>
+
+---
+
+## Quick start (in a minute)
+
+Pick the one that fits. **Option 1 needs nothing but a web page.**
+
+### 1. Embed it: 30 seconds, nothing to install
+
+Paste this where you want the Quran to appear (a blog post, a mosque site, a school portal, a WordPress "Custom HTML" block, a Notion embed, a WebView in your app):
+
+```html
+<div class="globalquran-book" data-surah="36" data-height="720"></div>
+<script src="https://globalquran.com/embed.js" async></script>
+```
+
+That is the whole thing. It opens Surah Ya-Sin, in a frame that fits your page, with audio, translations and tajweed colours already working. Change `data-surah` to any number from 1 to 114, add `data-ayah="255"` to land on a verse, `data-theme="night"` for a dark look, or `data-translation="fr.hamidullah"` for another language. [All options below](#embed-options).
+
+> The frame is an iframe, so your site's CSS and JavaScript cannot break the reader and it cannot break yours.
+
+### 2. Run it on your computer: 1 minute
+
+```bash
+git clone https://github.com/GlobalQuran/quran-anywhere.git
+cd quran-anywhere
+python3 -m http.server 8765      # or: make start
+```
+
+Open http://localhost:8765. That's the whole install: it is just a folder of static files.
+
+### 3. Publish your own copy: 2 minutes
+
+Upload the folder to **any** static host and you have your own Quran website at your own address: GitHub Pages, Netlify, Cloudflare Pages, Vercel, S3, nginx, Apache or plain shared hosting. No build command. Put it in a sub-folder (`yoursite.com/quran/`) if you like; links are relative. Then point your embeds at your copy: `<script src="https://YOUR-HOST/embed.js" async></script>`.
 
 ---
 
 ## Why Quran Anywhere
 
-Most Quran projects give you an API and leave the hard part to you: layout, fonts, audio, tajweed, translations, accessibility. Quran Anywhere is the finished reader. Drop it in and your visitors get a full, beautiful Quran experience on day one.
+Most Quran projects hand you an API and leave the hard part to you: page layout, fonts, audio, tajweed, translations, accessibility, phones. Quran Anywhere is the finished reader. Your visitors get a complete Quran experience on day one, and you write nothing.
 
-- **No build, no framework, no database.** Plain HTML, CSS and JavaScript.
-- **Two lines to embed** in a blog, a mosque website, a school portal or a WebView in your app.
-- **Any host:** GitHub Pages, Netlify, Cloudflare Pages, S3, nginx, Apache, shared hosting, or a sub-folder like `yoursite.com/quran/`.
-- **Nothing to set up:** text, translations and audio come from the free Global Quran API and CDN.
+- **No build, no framework, no database.** Plain HTML, CSS and JavaScript you can read and edit.
+- **Nothing to sign up for.** Text, 95 translations, word data and recitation audio come from the free Global Quran API and CDN.
+- **Looks right on every screen.** Phones, tablets, desktops; day and night; large text; right-to-left aware.
+- **Safe to embed.** Runs in its own frame; no tracking, no ads, no cookies of yours touched.
+- **Yours to change.** Fork it, restyle it, host it anywhere.
 
-## Embed it (2 lines)
+## Embed options
 
-```html
-<div class="globalquran-book" data-surah="2" data-ayah="1" data-height="720"></div>
-<script src="https://YOUR-HOST/embed.js" async></script>
-```
-
-The reader runs inside an iframe, so your page's CSS and JavaScript cannot break it, and it cannot break yours. See [`embed-demo.html`](embed-demo.html) for a full example on a sample blog.
+Every option is an attribute on the `div`. All are optional. See [`embed-demo.html`](embed-demo.html) for a full example on a sample blog: inline, on a dark section, and controlled from the page's own buttons.
 
 | Attribute | Values |
 |---|---|
@@ -57,25 +97,13 @@ book.pause();
 
 Listen for `globalquran:ready` and `globalquran:ayah` (`event.detail.surah`, `event.detail.ayah`).
 
-## Host the whole reader
-
-```bash
-git clone https://github.com/GlobalQuran/quran-anywhere.git
-cd quran-anywhere
-make start            # or: python3 -m http.server 8765
-```
-
-Open http://localhost:8765. That's the whole install. To publish, upload the folder to any static host.
-
-Want your own look? Fork it and edit the files directly: `app.css` for styling, `index.html` for layout, `app.js` for behaviour.
-
 ## Features
 
 - **Reading modes:** verse by verse, a flowing Reading view, a one-verse-at-a-time **Listen** view (with focus and full screen), saved verses.
 - **Mushaf text with tajweed colours** (with a colour key), plus Amiri Quran and other Arabic fonts, and calligraphic surah titles.
 - **95 translations, any number at once,** plus transliteration and word-by-word meanings.
-- **Audio:** reciter, then a translation voice per ayah, with speed, repeat and follow-along scrolling.
-- **Day / night / system theme,** text size, and remembered place and settings.
+- **Audio that keeps going:** pick a reciter and a translation voice, set speed and repeat, and it plays on from surah to surah through to the end of the Quran. Tap any verse number to play from there. Eye button flips between Listen and reading views.
+- **Day / night / system theme,** text size, and it remembers where you were. The browser tab title always shows the verse (`2:255 Al-Baqarah`).
 - **Links that work everywhere:** `#2:255` on any host, or clean `/2:255` paths where you can rewrite URLs.
 - **Accessible:** keyboard shortcuts (press `?`), screen-reader labels, reduced-motion and high-contrast support, WCAG AA contrast.
 
@@ -144,6 +172,7 @@ gq-api.js    API client (caching, errors)
 embed.js     the two-line embed
 data/        small local data (surah list, page table)
 fonts/ img/  fonts, frame, icons
+docs/        screenshots used in this README
 ```
 
 Edit a file, refresh the browser. When you change `app.css` or `app.js`, bump the `?v=` on its `<script>` / `<link>` in `index.html` so browsers fetch the new copy.
