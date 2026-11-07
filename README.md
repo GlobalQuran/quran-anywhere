@@ -3,7 +3,7 @@
 # Quran Anywhere
 
 **A complete, beautiful Quran reader you can put on any website or app in about a minute.**<br>
-Copy two lines of HTML. No account, no API key, no build, no server.
+Copy two lines of HTML. No account, no build, no server.
 
 [**Live demo**](https://globalquran.com) · [Embed demo](embed-demo.html) · [Quick start](#quick-start-in-a-minute) · [API docs](https://docs.globalquran.com) · [Open Quran data](https://github.com/GlobalQuran/data)
 

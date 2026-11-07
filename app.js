@@ -452,12 +452,34 @@
     if (act) return doAction(act.dataset.act, act.closest(".ayah"));
     const w = e.target.closest(".w"); if (w && WBW.on) { showWordTip(w); return; }
     hideWordTip();
-    const nb = e.target.closest(".num, .qe"), ay = e.target.closest(".ayah");
-    if (nb && ay) { const n = +ay.dataset.n; if (S.sel !== n) selectAyah(n); if (A.on && !A.paused) playAyah(n, S.s); return; }   // only while it is actually playing: selecting never starts audio   // the verse number: move here, and carry on playing from it
-    if (ay) selectAyah(+ay.dataset.n);
+    const nb = e.target.closest(".num, .qe, .vnum"), ay = e.target.closest(".ayah");
+    if (!(nb && ay) && !e.target.closest("#vpop")) closeVpop();
+    if (nb && ay) {
+      const n = +ay.dataset.n;
+      if (S.view === "read") { selectAyah(n, true); openVpop(nb, ay); return; }   // reading view: the number opens a little menu (play, save, copy, share)
+      if (S.sel !== n) selectAyah(n, true); if (A.on && !A.paused) playAyah(n, S.s); return;   // only while it is actually playing: selecting never starts audio
+    }
+    if (ay) selectAyah(+ay.dataset.n, S.view === "verse");   // verse by verse: the chosen verse stays chosen, with its buttons showing
   });
-  function selectAyah(n) {
-    const was = S.sel === n; $$(".ayah.sel").forEach(e => e.classList.remove("sel")); S.sel = was ? 0 : n;
+  /* the small menu on a verse number in the reading view */
+  const vpop = document.createElement("div"); vpop.id = "vpop"; vpop.hidden = true; vpop.setAttribute("role", "menu"); document.body.appendChild(vpop);
+  const closeVpop = () => { vpop.hidden = true; };
+  function openVpop(anchor, ay) {
+    const n = +ay.dataset.n, key = S.s + ":" + n, saved = bms.includes(key), ic = d => `<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+    vpop.innerHTML = `<div class="vp-h">${esc(meta(S.s).en)} ${key}</div><div class="vp-b">
+      <button type="button" role="menuitem" data-act="play">${ic('<path d="M7 5l12 7-12 7z"/>')}Play</button>
+      <button type="button" role="menuitem" data-act="mark">${ic('<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/>')}${saved ? "Saved" : "Save"}</button>
+      <button type="button" role="menuitem" data-act="copy">${ic('<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/>')}Copy</button>
+      <button type="button" role="menuitem" data-act="share">${ic('<circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><path d="M8.3 10.8l7.4-4.3M8.3 13.2l7.4 4.3"/>')}Share</button></div>`;
+    vpop.hidden = false; vpop._ay = ay;
+    const r = anchor.getBoundingClientRect(), W = vpop.offsetWidth, H = vpop.offsetHeight;
+    vpop.style.left = clamp(r.left + r.width / 2 - W / 2, 8, innerWidth - W - 8) + "px";
+    vpop.style.top = (r.bottom + H + 12 > innerHeight ? Math.max(8, r.top - H - 8) : r.bottom + 8) + "px";
+    const f = $("button", vpop); f && f.focus({ preventScroll: true });
+  }
+  vpop.addEventListener("click", e => { const b = e.target.closest("[data-act]"); if (!b || !vpop._ay) return; const ay = vpop._ay; closeVpop(); doAction(b.dataset.act, ay); });
+  function selectAyah(n, keep) {
+    const was = S.sel === n && !keep; $$(".ayah.sel").forEach(e => e.classList.remove("sel")); S.sel = was ? 0 : n;
     if (!was) { const el = $("#a" + n, inner); el.classList.add("sel"); $("[data-act=mark]", el).setAttribute("aria-pressed", bms.includes(S.s + ":" + n)); }
     paintReading(); idleLabel();
   }
@@ -490,7 +512,7 @@
   function doAction(act, el) {
     if (act === "nextSurah") return openSurah(S.s + 1, 1, { via: "end_button" });
     const n = +el.dataset.n, key = S.s + ":" + n; if (act !== "mark") stat("ayah_action", { action: act, surah: S.s, ayah: n, ref: key });   // which verses are played / copied / saved (no one's list, no identity)
-    if (act === "play") { playAyah(n); selectAyah(n); }
+    if (act === "play") { playAyah(n); selectAyah(n, S.view === "verse"); }
     if (act === "mark") { const i = bms.indexOf(key); i < 0 ? bms.push(key) : bms.splice(i, 1); stat("ayah_action", { action: i < 0 ? "save" : "unsave", surah: S.s, ayah: n, ref: key }); store.set("bm", JSON.stringify(bms)); $("[data-act=mark]", el).setAttribute("aria-pressed", i < 0); drawMarks(); syncSavedUi(); toast(i < 0 ? "Saved" : "Removed"); }
     if (act === "share") return shareAyah(S.s, n);
     if (act === "copy") {
@@ -663,7 +685,8 @@
   function playAyah(n, s = S.s, queue = null, qi = 0) {
     clearTimeout(A.simT); n = n === 0 ? 0 : clamp(n, 1, meta(s).c); if (!queue && n <= 1) markBism(s); const wasOff = !A.on; A.on = true; A.paused = false; A.s = s; A.n = n; A.q = queue; A.qi = qi; A.sim = 0; A.st = stagesNow(); A.stage = 0;
     if (wasOff) { A.played = 0; A.t0 = Date.now(); stat("play_start", { surah: s, ref: n > 0 ? s + ":" + n : "", from: queue ? "saved" : n === 0 ? "bismillah" : n === 1 ? "start" : "ayah", voices: A.st.join("+"), reciter: A.reciter, view: S.view, show: S.view === "read" ? S.rd : "both" }); }
-    if (S.view === "read" && !queue) { $$(".ayah.sel").forEach(e => e.classList.remove("sel")); S.sel = 0; }   // the click selection has done its job
+    if (S.view === "read" && !queue) { $$(".ayah.sel").forEach(e => e.classList.remove("sel")); S.sel = 0; }
+    else if (S.view === "verse" && !queue && s === S.s && n >= 1 && S.sel !== n && $("#a" + n, inner)) selectAyah(n, true);   // the buttons follow the verse being played   // the click selection has done its job
     showPlayer(true); markPlaying(); setPlayIcon();
     if (follow) { if (A.q) { const el = playingEl(); el && el.scrollIntoView({ block: "center", behavior: "smooth" }); } else smoothTo(n === 0 ? 0 : ayahTop(n) - Math.min(40, scroller.clientHeight * .06), .06); }
     startStage();
@@ -1027,7 +1050,7 @@
     if (kbdOpen()) { if (key === "Escape" || help) { e.preventDefault(); closeKbd(); } else if (key === "Tab") trapTab(e, kbdEl); return; }
     if (!$("#oops").hidden || !$("#privacy").hidden) return;
     if (help) { e.preventDefault(); return openKbd(); }
-    if (key === "Escape") { if (!shareEl.hidden) { closeShare(); return; } closeMenu(); hideWordTip(); showKey(false); closePops(); if (modesOn()) putAwayModes(); return; }
+    if (key === "Escape") { if (!vpop.hidden) { closeVpop(); return; } if (!shareEl.hidden) { closeShare(); return; } closeMenu(); hideWordTip(); showKey(false); closePops(); if (modesOn()) putAwayModes(); return; }
     const onCtl = t.closest && t.closest("button, a, summary, [role=tab], [role=slider], [role=checkbox]"), inMenu = t.closest && t.closest(".pop, .side, .tj-key");
     const verseKeys = ["ArrowLeft", "ArrowRight", "Home", "End"];
     if (verseKeys.includes(key) && (inMenu || (t.closest && t.closest("[role=slider]")))) return;   // lists, menus and the ribbon keep their own arrow keys
