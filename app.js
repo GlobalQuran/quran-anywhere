@@ -88,7 +88,7 @@
   /* ---------- state ---------- */
   const hadTr = qs.get("trs") ?? store.get("trs") ?? qs.get("tr") ?? store.get("tr");   // null = first visit: choose by browser language
   const trParse = v => String(v ?? "").split(",").map(x => x.trim()).filter(Boolean);
-  const S = { view: ["read", "listen"].includes(pref("view", "verse")) ? pref("view", "verse") : "verse", rd: pref("rd", "ar") === "tr" ? "tr" : "ar", rdTr: pref("rdtr", ""), data: null, ar: [], trList: [], tlList: [], trCache: {}, tlCache: {}, qcf: {}, s: 1, cur: 1, sel: 0, trs: trParse(pref("trs", pref("tr", "en.hilali"))), theme: pref("theme", "day"), offs: [], count: 0 };
+  const S = { last: ["read", "verse"].includes(pref("lastview", "verse")) ? pref("lastview", "verse") : "verse", view: ["read", "listen"].includes(pref("view", "verse")) ? pref("view", "verse") : "verse", rd: pref("rd", "ar") === "tr" ? "tr" : "ar", rdTr: pref("rdtr", ""), data: null, ar: [], trList: [], tlList: [], trCache: {}, tlCache: {}, qcf: {}, s: 1, cur: 1, sel: 0, trs: trParse(pref("trs", pref("tr", "en.hilali"))), theme: pref("theme", "day"), offs: [], count: 0 };
   let bms = []; try { bms = JSON.parse(store.get("bm") || "[]"); } catch (e) {}
   const meta = n => S.data.surahs[n - 1];
   /* plain Arabic text comes from the API (quran-uthmani), one surah at a time; if the API is unreachable the words of the glyph data stand in */
@@ -285,7 +285,7 @@
     el.style.fontSize = Math.min(100 * btn.clientWidth * .9 / r.width, 100 * cart.clientHeight * .74 / r.height, 70) + "px";
   }
   const ayahHtml = (s, n, text) => `<div class="ayah" id="a${n}" data-n="${n}" role="group" aria-label="Verse ${n}"><div class="ar${qcfOn(s) ? " tmp" : ""}" lang="ar" data-m="${qcfOn(s) ? "q" : "t"}">${arLine(s, n, text)}</div><div class="tlit"></div><div class="trs"></div>
-      <div class="actions"><button data-act="play"><svg><use href="img/sprite.svg#i-play"/></svg>Play from here</button><button data-act="mark" aria-pressed="false"><svg><use href="img/sprite.svg#i-star"/></svg>Save</button><button data-act="copy"><svg><use href="img/sprite.svg#i-copy"/></svg>Copy</button></div></div>`;
+      <div class="actions"><button data-act="play"><svg><use href="img/sprite.svg#i-play"/></svg>Play from here</button><button data-act="mark" aria-pressed="false"><svg><use href="img/sprite.svg#i-star"/></svg>Save</button><button data-act="copy"><svg><use href="img/sprite.svg#i-copy"/></svg>Copy</button><button data-act="share"><svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><path d="M8.3 10.8l7.4-4.3M8.3 13.2l7.4 4.3"/></svg>Share</button></div></div>`;
 
   /* ---------- render a surah ---------- */
   function renderSurah(n) {
@@ -302,7 +302,7 @@
     announce(`${m.en}, surah ${n}, ${m.c} verses`);
     $("#btnPrevS").disabled = n <= 1; $("#btnNextS").disabled = n >= 114;
     $$("#surahList button, #pickList button").forEach(b => { b.classList.toggle("cur", +b.dataset.s === n); +b.dataset.s === n ? b.setAttribute("aria-current", "true") : b.removeAttribute("aria-current"); });
-    document.title = `${m.en} · Global Quran`;
+    setTitle();
     buildRibbon(); recalc(); fitName(); if (typeof markPlaying === "function") markPlaying(); paintReading();
   }
   const keyBtn = $("#btnKey"), keyBox = $("#tjKey");
@@ -351,9 +351,14 @@
     if (scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 4 && o.length) { setCur(S.count); return; }
     setCur(n);
   }
+  function setTitle() {   // "2:255 Al-Baqarah · Global Quran": follows the reading place, or the ayah being played
+    if (S.mode === "saved") return;
+    const s = A.on ? A.s : S.s, n = A.on ? (A.n || 1) : (S.cur || 1), m = meta(s); if (!m) return;
+    document.title = `${s}:${n} ${m.en} · Global Quran`;
+  }
   function setCur(n) {
     if (n === S.cur && S.curS === S.s) { moveHandle(); return; }
-    S.cur = n; S.curS = S.s; progress(S.s, n);
+    S.cur = n; S.curS = S.s; progress(S.s, n); setTitle();
     $$(".ayah.cur").forEach(e => e.classList.remove("cur")); const el = $("#a" + n, inner); if (el) el.classList.add("cur");
     const m = meta(S.s);
     moveHandle(); if (typeof idleLabel === "function") idleLabel(); if (lsVis() && !A.on && Date.now() - LS.openAt > 1500) lsIdle(n);
@@ -447,7 +452,9 @@
     if (act) return doAction(act.dataset.act, act.closest(".ayah"));
     const w = e.target.closest(".w"); if (w && WBW.on) { showWordTip(w); return; }
     hideWordTip();
-    const ay = e.target.closest(".ayah"); if (ay) selectAyah(+ay.dataset.n);
+    const nb = e.target.closest(".num, .qe"), ay = e.target.closest(".ayah");
+    if (nb && ay) { const n = +ay.dataset.n; if (S.sel !== n) selectAyah(n); if (A.on && !A.paused) playAyah(n, S.s); return; }   // only while it is actually playing: selecting never starts audio   // the verse number: move here, and carry on playing from it
+    if (ay) selectAyah(+ay.dataset.n);
   });
   function selectAyah(n) {
     const was = S.sel === n; $$(".ayah.sel").forEach(e => e.classList.remove("sel")); S.sel = was ? 0 : n;
@@ -485,10 +492,35 @@
     const n = +el.dataset.n, key = S.s + ":" + n; if (act !== "mark") stat("ayah_action", { action: act, surah: S.s, ayah: n, ref: key });   // which verses are played / copied / saved (no one's list, no identity)
     if (act === "play") { playAyah(n); selectAyah(n); }
     if (act === "mark") { const i = bms.indexOf(key); i < 0 ? bms.push(key) : bms.splice(i, 1); stat("ayah_action", { action: i < 0 ? "save" : "unsave", surah: S.s, ayah: n, ref: key }); store.set("bm", JSON.stringify(bms)); $("[data-act=mark]", el).setAttribute("aria-pressed", i < 0); drawMarks(); syncSavedUi(); toast(i < 0 ? "Saved" : "Removed"); }
+    if (act === "share") return shareAyah(S.s, n);
     if (act === "copy") {
       const t = [arText(S.s, n), ...(TL.on ? [tlText(S.s, n)] : []), ...trTexts(S.s, n), `— ${meta(S.s).en} ${key}`].join("\n");
       (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(() => toast("Copied"), () => toast("Couldn't copy"));
     }
+  }
+  /* ---------- share a verse: the phone's own share sheet where there is one, else a small menu ---------- */
+  const verseLink = (s, n) => location.origin + (urlMode() === "path" ? baseFolder() + s + ":" + n : (new URL(document.baseURI).origin === location.origin ? DOCBASE : location.pathname) + "#" + s + ":" + n);
+  const verseText = (s, n) => [arText(s, n), ...trTexts(s, n).slice(0, 1), `— ${meta(s).en} ${s}:${n}`].join("\n");
+  const shareEl = document.createElement("div"); shareEl.id = "shareMenu"; shareEl.hidden = true; shareEl.setAttribute("role", "dialog"); shareEl.setAttribute("aria-label", "Share this verse"); document.body.appendChild(shareEl);
+  const closeShare = () => { shareEl.hidden = true; };
+  async function shareAyah(s, n) {
+    const url = verseLink(s, n), text = verseText(s, n), title = `${meta(s).en} ${s}:${n}`;
+    stat("ayah_action", { action: "share", surah: s, ayah: n, ref: s + ":" + n });
+    if (navigator.share) { try { await navigator.share({ title, text, url }); return; } catch (e) { if (e && e.name === "AbortError") return; } }   // cancelled: nothing more to do
+    const enc = encodeURIComponent, msg = text + "\n" + url, ic = (d, c) => `<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="${c || "currentColor"}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+    const rows = [
+      ["WhatsApp", "https://wa.me/?text=" + enc(msg)], ["Telegram", `https://t.me/share/url?url=${enc(url)}&text=${enc(text)}`],
+      ["X", `https://twitter.com/intent/tweet?text=${enc(text)}&url=${enc(url)}`], ["Facebook", "https://www.facebook.com/sharer/sharer.php?u=" + enc(url)],
+      ["Email", `mailto:?subject=${enc(title)}&body=${enc(msg)}`]];
+    shareEl.innerHTML = `<div class="sh-back" data-close="1"></div><div class="sh-card"><div class="sh-h"><b>Share ${esc(title)}</b><button type="button" class="pl-b" data-close="1" aria-label="Close">${ic('<path d="M6 6l12 12M18 6L6 18"/>')}</button></div>
+      <blockquote lang="ar">${esc(arText(s, n))}</blockquote>
+      <div class="sh-grid">${rows.map(([n2, h]) => `<a href="${h}" target="_blank" rel="noopener noreferrer">${esc(n2)}</a>`).join("")}<button type="button" data-copy="link">Copy link</button><button type="button" data-copy="text">Copy verse</button></div></div>`;
+    shareEl.hidden = false; const f = $("a", shareEl); f && f.focus();
+    shareEl.onclick = e => {
+      if (e.target.closest("[data-close]")) return closeShare();
+      const c = e.target.closest("[data-copy]"); if (c) { (navigator.clipboard ? navigator.clipboard.writeText(c.dataset.copy === "link" ? url : msg) : Promise.reject()).then(() => toast("Copied"), () => toast("Couldn't copy")); closeShare(); }
+      else if (e.target.closest("a")) setTimeout(closeShare, 100);
+    };
   }
   function markBookmarks() { $$(".ayah", inner).forEach(el => { const k = S.s + ":" + el.dataset.n; const b = $("[data-act=mark]", el); if (b) b.setAttribute("aria-pressed", bms.includes(k)); }); }
 
@@ -621,7 +653,7 @@
   new ResizeObserver(() => root.style.setProperty("--foot", ($("#foot").offsetHeight + 10) + "px")).observe($("#foot"));
   function setPlayIcon() { lsState(); $("#plPlay use").setAttribute("href", "img/sprite.svg#" + (A.on && !A.paused ? "i-pause" : "i-play")); $("#plPlay").setAttribute("aria-label", A.on && !A.paused ? "Pause" : "Play"); }
   function playingEl() { if (!A.on || A.n == null) return null; if (A.n === 0) return (!A.q && A.s === S.s) ? $(".bism", inner) : null; return A.q ? $(`#svinner .ayah[data-s="${A.s}"][data-n="${A.n}"]`) : (A.s === S.s ? $("#a" + A.n, inner) : null); }
-  function markPlaying() { $$(".ayah.playing, .bism.playing").forEach(e => e.classList.remove("playing")); const el = playingEl(); if (el) el.classList.add("playing"); root.classList.toggle("playing-on", !!el); paintReading(); }
+  function markPlaying() { setTitle(); $$(".ayah.playing, .bism.playing").forEach(e => e.classList.remove("playing")); const el = playingEl(); if (el) el.classList.add("playing"); root.classList.toggle("playing-on", !!el); paintReading(); }
   function nowLabel(extra = "") {
     const m = meta(A.s); $("#plSurah").textContent = `${m.n}. ${m.en}`;
     const voice = A.st.length > 1 ? (A.st[A.stage] === "ar" ? " · Quran" : " · Translation") : (A.st[0] === "tr" ? " · Translation" : "");
@@ -660,7 +692,14 @@
     if (A.q) { if (A.qi < A.q.length - 1) { const [s, n] = A.q[A.qi + 1]; return playAyah(n, s, A.q, A.qi + 1); } if (A.repeat === 2) { const [s, n] = A.q[0]; return playAyah(n, s, A.q, 0); } return stopAudio(); }
     if (A.n < meta(A.s).c) return playAyah(A.n + 1, A.s);
     if (A.repeat === 2) return playAyah(1, A.s);
-    stopAudio();
+    nextSurahPlay();
+  }
+  async function nextSurahPlay() {   // surah finished: carry on with the next one, until after surah 114
+    if (A.s >= 114) return stopAudio();
+    const to = A.s + 1; A.paused = false; $("#plPlay").classList.add("loading");
+    await openSurah(to, 1, { keepAudio: true, via: "autoplay" });
+    if (!A.on || S.s !== to) return;   // stopped, or another surah was opened meanwhile
+    playAyah(hasBism(to) ? 0 : 1, to);
   }
   function stopAudio() { plHide = false; lsEl.classList.remove("plhid"); setTimeout(lsIdle, 0); if (A.on) stat("play_stop", { surah: A.s, ayahs: A.played || 0, secs: Math.round((Date.now() - (A.t0 || Date.now())) / 1000) }); A.on = false; A.paused = false; A.sim = 0; A.q = null; clearTimeout(A.simT); audio.pause(); audio.removeAttribute("src"); showPlayer(false); markPlaying(); setPlayIcon(); $("#plFill").style.width = "0%"; $("#plPlay").classList.remove("loading"); }
   function togglePlay() {
@@ -686,6 +725,7 @@
   audio.addEventListener("timeupdate", () => { if (A.on && audio.duration) $("#plFill").style.width = (audio.currentTime / audio.duration * 100) + "%"; });
   audio.addEventListener("playing", () => $("#plPlay").classList.remove("loading"));
   $("#plPlay").onclick = togglePlay; $("#btnListen").onclick = togglePlay; $("#plClose").onclick = () => { if (S.view === "listen" && A.on && !plHide) { plHide = true; showPlayer(true); lsEl.classList.add("plhid"); $("#lsVoice").title = "Show player controls"; } else stopAudio(); };   // in Listen view the stage has its own controls: X only tucks the player away
+  $("#plEye").onclick = () => setView(S.view === "listen" ? (S.last || "verse") : "listen");   // flips between Listen and the reading view you last chose
   $("#plNext").onclick = () => skip(1); $("#plPrev").onclick = () => skip(-1);
   $("#plBar").onclick = e => { if (!A.on || A.sim || !audio.duration) return; const r = e.currentTarget.getBoundingClientRect(); audio.currentTime = clamp((e.clientX - r.left) / r.width, 0, 1) * audio.duration; };
   function syncRepeatUi() { const b = $("#plRepeat"), x3 = A.times > 1; b.classList.toggle("on", A.repeat > 0 || x3); $("#rpBadge").textContent = x3 ? "×" + A.times : A.repeat === 1 ? "1" : A.repeat === 2 ? "∞" : ""; b.title = x3 ? `Repeat: each verse ${A.times} times` : "Repeat: " + ["off", "this ayah", "all"][A.repeat]; }
@@ -769,9 +809,9 @@
   const syncMenuBtn = () => $("#btnMenu").setAttribute("aria-expanded", menuOpen());
   function toggleMenu() {
     if (drawerMode()) menuOpen() ? closeMenu() : openMenu();
-    else { app.classList.toggle("side-off"); store.set("sideOff", app.classList.contains("side-off") ? "1" : ""); syncMenuBtn(); }
+    else { app.classList.toggle("side-off"); store.set("sideOff", app.classList.contains("side-off") ? "1" : "0"); syncMenuBtn(); }
   }
-  if (store.get("sideOff") === "1") app.classList.add("side-off");
+  if (store.get("sideOff") !== "0" && !(EMBED && root.classList.contains("embed-side"))) app.classList.add("side-off");   // closed unless the visitor opened it
   wideMq.addEventListener && wideMq.addEventListener("change", () => { app.classList.remove("menu-open"); syncMenuBtn(); });
   function openMenu() { app.classList.add("menu-open"); syncMenuBtn(); const cur = $("#surahList button.cur"); cur && cur.scrollIntoView({ block: "center" }); }
   function closeMenu() { app.classList.remove("menu-open"); syncMenuBtn(); }
@@ -797,11 +837,11 @@
   /* ---------- reading view: verse by verse (default) or one flowing text, Arabic OR a single translation ---------- */
   function syncView() {
     root.classList.toggle("listen-on", S.view === "listen"); if (S.view !== "listen" && plHide) { plHide = false; lsEl.classList.remove("plhid"); if (A.on) showPlayer(true); } lsVisibility();
-    root.classList.toggle("read-on", S.view === "read"); root.classList.toggle("rd-tr", readTr());
+    $("#plEye").setAttribute("aria-pressed", S.view === "listen"); root.classList.toggle("read-on", S.view === "read"); root.classList.toggle("rd-tr", readTr());
     $$("#segView button").forEach(b => b.setAttribute("aria-pressed", b.dataset.v === S.view)); $$("#segRd button").forEach(b => b.setAttribute("aria-pressed", b.dataset.v === S.rd));
   }
   const reRender = () => openSurah(S.s, S.cur || 1, { flash: false, keepAudio: true });
-  async function setView(v) { stat("setting_change", { setting: "view", value: v }); S.view = v; store.set("view", v); if (readTr()) await loadTr(S.rdTr); syncView(); syncTrChip(); syncReciters(); reRender(); }
+  async function setView(v) { stat("setting_change", { setting: "view", value: v }); S.view = v; store.set("view", v); if (v !== "listen") { S.last = v; store.set("lastview", v); } if (readTr()) await loadTr(S.rdTr); syncView(); syncTrChip(); syncReciters(); reRender(); }
   async function setRd(v) { stat("setting_change", { setting: "show", value: v }); S.rd = v; store.set("rd", v); if (readTr()) await loadTr(S.rdTr); syncView(); syncTrChip(); syncReciters(); reRender(); }
   async function setRdTr(id) { S.rdTr = id; store.set("rdtr", id); await loadTr(id); syncTrChip(); syncReciters(); reRender(); }
   $("#segView").addEventListener("click", e => { const b = e.target.closest("[data-v]"); if (b && b.dataset.v !== S.view) setView(b.dataset.v); });
@@ -987,7 +1027,7 @@
     if (kbdOpen()) { if (key === "Escape" || help) { e.preventDefault(); closeKbd(); } else if (key === "Tab") trapTab(e, kbdEl); return; }
     if (!$("#oops").hidden || !$("#privacy").hidden) return;
     if (help) { e.preventDefault(); return openKbd(); }
-    if (key === "Escape") { closeMenu(); hideWordTip(); showKey(false); closePops(); if (modesOn()) putAwayModes(); return; }
+    if (key === "Escape") { if (!shareEl.hidden) { closeShare(); return; } closeMenu(); hideWordTip(); showKey(false); closePops(); if (modesOn()) putAwayModes(); return; }
     const onCtl = t.closest && t.closest("button, a, summary, [role=tab], [role=slider], [role=checkbox]"), inMenu = t.closest && t.closest(".pop, .side, .tj-key");
     const verseKeys = ["ArrowLeft", "ArrowRight", "Home", "End"];
     if (verseKeys.includes(key) && (inMenu || (t.closest && t.closest("[role=slider]")))) return;   // lists, menus and the ribbon keep their own arrow keys
@@ -1210,7 +1250,8 @@
     const cur = mTop(mCur());
     mChips.innerHTML = MODES.map(m => `<button type="button" class="mchip${m.id === cur ? " cur" : ""}" data-m="${m.id}"${m.subs ? ` aria-expanded="${mOpen === m.id}" aria-controls="modesSub"` : ""}><svg viewBox="0 0 24 24" aria-hidden="true">${MICON[m.id]}</svg><b>${esc(m.name)}</b><small>${esc(m.hint)}</small></button>`).join("");
     const m = MODES.find(x => x.id === mOpen);
-    mSub.hidden = !m; mSub.innerHTML = m ? m.subs.map(s => `<button type="button" class="msub" data-s="${s.id}"><b>${esc(s.name)}${s.def ? "<em>Default</em>" : ""}</b><span>${esc(s.text)}</span></button>`).join("") : "";
+    mChips.hidden = !!m;   // a mode with choices replaces the four options, so it is clear a choice is still to be made
+    mSub.hidden = !m; mSub.innerHTML = m ? `<button type="button" class="msub-back" data-back="1"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>All modes</button><h3 class="msub-h">${esc(m.name)}: choose one</h3>` + m.subs.map(s => `<button type="button" class="msub" data-s="${s.id}"><b>${esc(s.name)}${s.def ? "<em>Default</em>" : ""}</b><span>${esc(s.text)}</span></button>`).join("") : "";
   }
   function showModes(on, focus) {
     modesEl.hidden = !on; if (!on) { mOpen = ""; return; }
@@ -1228,7 +1269,7 @@
     A.times = id === "memorise" ? 3 : 1; syncRepeatUi();
     if ((id === "read" || id === "memorise") && !TJ.on && tjOk(FONT)) await setTajweed(true);
     const view = { read: "read", read_understand: "verse", understand: "read" }[id] || "listen", show = id === "understand" ? "tr" : "ar";
-    S.view = view; S.rd = show; store.set("view", view); store.set("rd", show);
+    S.view = view; S.rd = show; store.set("view", view); store.set("rd", show); if (view !== "listen") { S.last = view; store.set("lastview", view); }
     if (!S.trList.some(t => t.id === S.rdTr)) S.rdTr = S.trs[0] || "en.sahih";
     if (readTr()) await loadTr(S.rdTr);
     syncView(); syncTrChip(); syncReciters(); await reRender();
@@ -1237,9 +1278,12 @@
   }
   mChips.addEventListener("click", e => {
     const b = e.target.closest("[data-m]"); if (!b) return; const m = MODES.find(x => x.id === b.dataset.m);
-    if (m.subs) { mOpen = mOpen === m.id ? "" : m.id; drawModes(); const f = mOpen && $(".msub", mSub); } else applyMode(m.id);
+    if (m.subs) { mOpen = m.id; drawModes(); const f = $(".msub", mSub); f && f.focus({ preventScroll: true }); } else applyMode(m.id);
   });
-  mSub.addEventListener("click", e => { const b = e.target.closest("[data-s]"); if (b) applyMode(b.dataset.s); });
+  mSub.addEventListener("click", e => {
+    if (e.target.closest("[data-back]")) { mOpen = ""; drawModes(); const f = $(".mchip", mChips); f && f.focus({ preventScroll: true }); return; }
+    const b = e.target.closest("[data-s]"); if (b) applyMode(b.dataset.s);
+  });
   $("#modesX").onclick = putAwayModes;
   $("#btnModes").onclick = () => { showTools(false); showModes(true, true); };
   $(".brand").addEventListener("click", e => { if (EMBED) return; e.preventDefault(); openSurah(1, 1, { via: "home" }); showModes(true); });   // the logo is the way "home": the landing page and its note

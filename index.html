@@ -26,7 +26,7 @@ window.gq = window.gq || { _quran: [], setConfig: function (c) { window.GQ_LEGAC
 <meta name="theme-color" content="#1a2224">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Global Quran">
-<link rel="stylesheet" href="app.css?v=67">
+<link rel="stylesheet" href="app.css?v=70">
 </head>
 <body>
 <a class="skip" id="skip" href="#">Skip to the Quran text</a>
@@ -244,6 +244,7 @@ window.gq = window.gq || { _quran: [], setConfig: function (c) { window.GQ_LEGAC
             <div class="plp-opts">
               <button class="vpill" id="plVoices" aria-label="Voices and speed" aria-haspopup="dialog" aria-expanded="false" aria-controls="voices" title="Voices and speed"></button>
               <button class="pl-b" id="plRepeat" aria-label="Repeat" title="Repeat: off"><svg><use href="img/sprite.svg#i-repeat"/></svg><i class="rp" id="rpBadge"></i></button>
+              <button class="pl-b" id="plEye" aria-label="Switch between listening and reading view" aria-pressed="false" title="Listen view / reading view"><svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
               <button class="pl-b" id="plClose" aria-label="Close player"><svg><use href="img/sprite.svg#i-close"/></svg></button>
             </div>
             <div class="pl-bar" id="plBar" role="progressbar" aria-label="Ayah progress"><i id="plFill"></i></div>
@@ -274,7 +275,7 @@ window.gq = window.gq || { _quran: [], setConfig: function (c) { window.GQ_LEGAC
 <audio id="audio" preload="none"></audio>
 <script src="gq-api.js?v=3"></script>
 <script src="analytics.js?v=2"></script>
-<script src="app.js?v=64"></script>
-<script src="site.js?v=8"></script>
+<script src="app.js?v=70"></script>
+<script src="site.js?v=9"></script>
 </body>
 </html>
