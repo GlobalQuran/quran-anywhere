@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quiet Mornings — a blog that embeds the Global Quran reader</title>
+<style>
+  /* This page stands in for someone else's blog, with its own header, fonts, colours and layout. */
+  :root { --brand: #2f5d8a; --bg: #f7f3ea; --ink: #2b2a27; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 18px/1.7 Georgia, "Times New Roman", serif; color: var(--ink); background: var(--bg); }
+  a { color: var(--brand); }
+  .top { background: #fff; border-bottom: 3px solid var(--brand); }
+  .top-in { max-width: 1180px; margin: 0 auto; padding: 16px 22px; display: flex; align-items: center; gap: 28px; flex-wrap: wrap; }
+  .logo { font: 700 26px/1 "Trebuchet MS", sans-serif; color: var(--brand); text-decoration: none; letter-spacing: -.02em; }
+  .top nav { display: flex; gap: 20px; font: 600 15px "Trebuchet MS", sans-serif; }
+  .top nav a { text-decoration: none; color: #555; }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 30px 22px 60px; display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 46px; }
+  h1 { font: 700 40px/1.15 "Trebuchet MS", sans-serif; margin: 0 0 8px; letter-spacing: -.02em; }
+  .meta { font: 14px "Trebuchet MS", sans-serif; color: #888; margin-bottom: 22px; }
+  .embed-box { margin: 26px 0; }
+  .caption { font: italic 14px/1.4 Georgia, serif; color: #8a8576; margin-top: 6px; }
+  aside .card { background: #fff; border: 1px solid #e4dfd0; border-radius: 6px; padding: 16px 18px; margin-bottom: 22px; font: 15px/1.5 "Trebuchet MS", sans-serif; }
+  aside h3 { margin: 0 0 8px; font: 700 14px "Trebuchet MS", sans-serif; text-transform: uppercase; letter-spacing: .06em; color: var(--brand); }
+  .wide { background: #1f2a33; color: #e8eef3; padding: 50px 22px 60px; }
+  .wide .in { max-width: 1180px; margin: 0 auto; }
+  .wide h2 { font: 700 30px "Trebuchet MS", sans-serif; margin: 0 0 6px; }
+  .wide p { color: #aab7c2; margin: 0 0 26px; }
+  .tools { display: flex; gap: 10px; flex-wrap: wrap; margin: 14px 0 0; font: 14px "Trebuchet MS", sans-serif; }
+  .tools button { padding: 8px 14px; border: 1px solid #b9c3cc; background: #fff; border-radius: 4px; cursor: pointer; }
+  footer { text-align: center; padding: 30px; font: 14px "Trebuchet MS", sans-serif; color: #999; }
+  @media (max-width: 900px) { .wrap { grid-template-columns: 1fr; } h1 { font-size: 30px; } }
+</style>
+</head>
+<body>
+<header class="top"><div class="top-in">
+  <a class="logo" href="#">Quiet Mornings</a>
+  <nav><a href="#">Home</a><a href="#">Reflections</a><a href="#">Recipes</a><a href="#">About</a></nav>
+</div></header>
+
+<div class="wrap">
+  <article>
+    <h1>Reading Surah Al-Baqarah slowly</h1>
+    <div class="meta">By Amina · 4 November · 6 min read</div>
+    <p>I started the year with a simple habit: a few verses each morning, slowly, with a cup of tea. The full surah is below — you can read, scroll and listen right here without leaving the page.</p>
+
+    <div class="embed-box">
+      <div class="globalquran-book" data-surah="2" data-ayah="1" data-height="720" data-theme="auto"></div>
+      <div class="caption">Embedded with two lines of HTML. Drag the gold ribbon to move through the surah, or press play to listen. (If Global Quran ever requires API keys, add <code>data-api-key="YOUR_KEY"</code> to the div.)</div>
+    </div>
+
+    <p>What strikes me every time is how the first verses set out who the Book is for. I like to read the translation aloud and then sit with a single word for a minute. The gold ribbon on the right lists every ayah number; drag it to scrub quickly through a long surah.</p>
+    <p>If you would like to follow along, tap a verse to save it, copy it, or play from there.</p>
+    <h3>A few notes</h3>
+    <ul><li>Read the verses before reading commentary.</li><li>Keep one word as your focus for the day.</li><li>Come back to the same page the next morning.</li></ul>
+  </article>
+
+  <aside>
+    <div class="card"><h3>About</h3>Slow reading, slow tea, and notes on keeping a morning routine.</div>
+    <div class="card" style="padding:12px 10px">
+      <h3 style="padding:0 8px">Verse of the day</h3>
+      <!-- narrow sidebar slot: the book reflows to a single scrolling page -->
+      <div class="globalquran-book" data-surah="1" data-height="560" data-theme="day" data-translation="en.sahih"></div>
+    </div>
+    <div class="card"><h3>Subscribe</h3>One short email each Sunday.</div>
+  </aside>
+</div>
+
+<section class="wide"><div class="in">
+  <h2>Full width on a dark section</h2>
+  <p>With room to spare the surah list appears on the left. Night theme, and the background is transparent so it sits on the host's colour.</p>
+  <div class="globalquran-book" id="wideBook" data-surah="36" data-height="760" data-theme="night" data-sidebar="1" data-accent="d5b75b"></div>
+  <div class="tools">
+    <button onclick="document.getElementById('wideBook').globalquran.goto(55, 1)">Open Ar-Rahman (host → reader)</button>
+    <button onclick="document.getElementById('wideBook').globalquran.goto(2, 255)">Go to 2:255</button>
+    <button onclick="document.getElementById('wideBook').globalquran.setTheme('day')">Day theme</button>
+    <span id="status" style="align-self:center;color:#aab7c2">Waiting for the book…</span>
+  </div>
+</div></section>
+
+<footer>© Quiet Mornings — a made-up blog used to test the Global Quran embed.</footer>
+
+<script src="embed.js" async></script>
+<script>
+  document.addEventListener('globalquran:ayah', function (e) { if (e.target.id === 'wideBook') document.getElementById('status').textContent = 'Reader → host: now at ' + e.detail.surah + ':' + e.detail.ayah; });
+</script>
+</body>
+</html>
