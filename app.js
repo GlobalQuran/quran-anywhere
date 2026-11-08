@@ -1167,7 +1167,7 @@
      big Play. Paused: everything freezes and dims with a "Paused" mark. The page itself (mushaf glyphs / chosen font, tajweed colours, translation) is the same as elsewhere.
      Behind the text a canvas draws a slow rotating geometric rosette and drifting light motes; it runs while playing, drifts gently when idle, stops when paused. */
   const lsEl = $("#lstage"), lsText = $("#lsText"), lsBody = $("#lsBody"), lsCv = $("#lsCanvas");
-  const LS = { openAt: 0, tok: 0, key: "", raf: 0, last: 0, phase: 0, speed: .3, amp: 0, motes: null, still: matchMedia("(prefers-reduced-motion: reduce)").matches };
+  const LS = { bg: 2, live: false, openAt: 0, tok: 0, key: "", raf: 0, last: 0, phase: 0, speed: .3, amp: 0, motes: null, still: matchMedia("(prefers-reduced-motion: reduce)").matches };
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   const lsVis = () => S.view === "listen" && S.mode !== "saved" && !!S.data;
   function lsVisibility() { lsEl.hidden = !lsVis(); if (lsVis()) { lsSize(); lsKick(); } else { cancelAnimationFrame(LS.raf); LS.raf = 0; } if (typeof lsWake === "function") lsWake(); }
@@ -1245,6 +1245,7 @@
     lsTabs(); lsWake();
   }
   function lsAfterOpen(ayah) { if (!lsVis()) return; LS.openAt = Date.now(); LS.key = ""; LS.first = true; A.on ? lsStage() : lsIdle(ayah || 1); }
+  $("#lsBg").onclick = () => { LS.bg = LS.bg % 4 + 1; store.set("lsbg", String(LS.bg)); lsDraw(0); lsKick(); toast(`Background ${LS.bg} of 4: ${LS_BG[LS.bg - 1]}`); };   // for choosing the default; the choice is remembered
   $("#lsShare").onclick = () => shareAyah(LS.s || S.s, Math.max(1, LS.n || S.cur || 1));   // shares what is on the stage, in the voices it is playing
   $("#lsVoice").onclick = e => { if (plHide) { e.stopPropagation(); }  if (plHide) { plHide = false; lsEl.classList.remove("plhid"); $("#lsVoice").title = ""; showPlayer(true); } };
   /* full screen: the stage fills the screen (real full screen where the browser allows it, otherwise it just covers the page); only the verse and the animation stay.
@@ -1299,8 +1300,10 @@
     const dpr = Math.min(2, devicePixelRatio || 1), w = lsEl.clientWidth, h = lsEl.clientHeight; if (!w || !h) return;
     lsCv.width = Math.round(w * dpr); lsCv.height = Math.round(h * dpr);
     LS.motes = Array.from({ length: Math.round(w * h / 12000) + 16 }, () => ({ x: Math.random(), y: Math.random(), r: .5 + Math.random() * 1.7, v: .00002 + Math.random() * .00005, p: Math.random() * 6.28, tw: Math.random() < .25 }));
+    LS.stars = Array.from({ length: Math.round(w * h / 4200) + 30 }, () => { const z = Math.random(); return { x: Math.random(), y: Math.random() * .96, z, r: .4 + z * 1.5, v: .000004 + z * .000016, p: Math.random() * 6.28, f: .0006 + Math.random() * .0022 }; });
     lsDraw(0);
   }
+  { const q = parseInt(new URLSearchParams(location.search).get("bg"), 10), s = parseInt(store.get("lsbg"), 10); LS.bg = (q >= 1 && q <= 4) ? q : (s >= 1 && s <= 4) ? s : 2; }   // none chosen yet: Ripples
   const P2 = Math.PI * 2;
   function lsStar(g, cx, cy, r, n, step, rot) {   // the {n/step} star polygon: every vertex joined to the one `step` further round
     g.beginPath();
@@ -1310,15 +1313,32 @@
   function lsKhatam(g, cx, cy, r, rot) {   // a small eight-pointed star: two squares
     g.beginPath(); for (let k = 0; k < 2; k++) for (let i = 0; i <= 4; i++) { const a = rot + k * Math.PI / 4 + i * Math.PI / 2, x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r; i ? g.lineTo(x, y) : g.moveTo(x, y); } g.stroke();
   }
-  function lsDraw(dt) {
-    const g = lsCv.getContext("2d"), w = lsCv.width, h = lsCv.height; if (!w) return;
-    const night = root.classList.contains("night"), col = night ? "222,190,96" : "150,122,40", ph = LS.phase, cx = w / 2, cy = h / 2, R = Math.min(w, h) * .5, u = Math.max(1, w / 800), amp = LS.amp;
-    g.clearRect(0, 0, w, h);
-    /* the halo: breathes slowly, swells with the voice */
-    const br = .5 + .5 * Math.sin(ph * .0012), hal = (night ? .17 : .13) + br * .05 + amp * .3;
+  /* The Listen stage's background comes in four looks to choose from (the layers button on the stage cycles them, ?bg=1..4 opens one, the choice is remembered):
+     1 Girih (the illuminated rings), 2 Ripples (rings of light spreading with the voice), 3 Night sky (stars drifting, a crescent, a glow on the horizon), 4 Aurora (soft
+     drifting light and flowing ribbons). All of them: the same halo and calligraphic watermark, nothing above ~30% alpha, no six-pointed figure (stars are plain dots; rings
+     and lobes come in 8-, 16- or 32-fold counts). They all breathe with LS.amp. */
+  const LS_BG = ["Girih", "Ripples", "Night sky", "Aurora"];
+  function lsHalo(g, c, k) {   // the breathing halo, swelling with the voice
+    const { w, h, cx, cy, R, ph, amp, night, col } = c, br = .5 + .5 * Math.sin(ph * .0012), hal = ((night ? .17 : .13) + br * .05 + amp * .3) * (k || 1);
     const gr = g.createRadialGradient(cx, cy, 0, cx, cy, R * (1.05 + amp * .25));
-    gr.addColorStop(0, `rgba(${col},${hal.toFixed(3)})`); gr.addColorStop(.45, `rgba(${col},${((night ? .06 : .045) + amp * .05).toFixed(3)})`); gr.addColorStop(1, `rgba(${col},0)`);
+    gr.addColorStop(0, `rgba(${col},${hal.toFixed(3)})`); gr.addColorStop(.45, `rgba(${col},${(((night ? .06 : .045) + amp * .05) * (k || 1)).toFixed(3)})`); gr.addColorStop(1, `rgba(${col},0)`);
     g.fillStyle = gr; g.fillRect(0, 0, w, h);
+  }
+  function lsMark(g, c) {   // the surah's name in calligraphy, as a watermark behind everything
+    const { cx, cy, R, amp, night, col } = c;
+    if (LS.s && document.fonts && document.fonts.check("20px SurahNames")) { g.save(); g.font = `${Math.round(R * .9)}px SurahNames`; g.textAlign = "center"; g.textBaseline = "middle"; g.fillStyle = `rgba(${col},${((night ? .1 : .085) + amp * .05).toFixed(3)})`; g.fillText(pad3(LS.s), cx, cy); g.restore(); }
+  }
+  function lsMotes(g, c, dt, k) {   // motes drifting up, a few of them twinkling
+    const { w, h, u, ph, amp, night, col } = c;
+    if (LS.motes) for (const m of LS.motes) {
+      m.y -= m.v * dt; if (m.y < -.02) { m.y = 1.02; m.x = Math.random(); }
+      const tw = m.tw ? Math.max(0, Math.sin(ph * .004 + m.p)) ** 6 : 0, a = ((.22 + .5 * (.5 + .5 * Math.sin(ph * .002 + m.p))) * (night ? .9 : .6) + tw * .6 + amp * .2) * (k || 1);
+      g.fillStyle = `rgba(${col},${Math.min(1, a).toFixed(3)})`; g.beginPath(); g.arc(m.x * w, m.y * h, m.r * u * (1 + tw * 1.5), 0, P2); g.fill();
+    }
+  }
+  function lsBgGirih(g, c, dt) {
+    const { cx, cy, R, u, ph, amp, night, col } = c;
+    lsHalo(g, c);
     /* light rays, turning very slowly */
     g.save(); g.translate(cx, cy); g.rotate(ph * .000012);
     for (let i = 0; i < 32; i++) {
@@ -1327,8 +1347,7 @@
       g.fillStyle = rg; g.beginPath(); g.moveTo(0, 0); g.arc(0, 0, R * 1.6, a - wd, a + wd); g.closePath(); g.fill();
     }
     g.restore();
-    /* the surah's name in calligraphy, as a watermark behind everything */
-    if (LS.s && document.fonts && document.fonts.check("20px SurahNames")) { g.save(); g.font = `${Math.round(R * .9)}px SurahNames`; g.textAlign = "center"; g.textBaseline = "middle"; g.fillStyle = `rgba(${col},${((night ? .1 : .085) + amp * .05).toFixed(3)})`; g.fillText(pad3(LS.s), cx, cy); g.restore(); }
+    lsMark(g, c);
     /* girih rings: interlaced star polygons turning against each other (eight-fold family only) */
     g.lineJoin = "round"; g.lineCap = "round";
     const rings = [[.2, 8, 3, -1], [.34, 16, 6, 1], [.5, 16, 5, -1], [.68, 32, 12, 1], [.88, 32, 13, -1]];   // 8-, 16- and 32-fold only: never a count divisible by 3, whose crossings form six-pointed figures
@@ -1343,17 +1362,81 @@
       const a = ph * .00004 + i * P2 / 16, r = R * .59, x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r;
       g.lineWidth = .9 * u; g.strokeStyle = `rgba(${col},${Math.min(1, (night ? .3 : .24) * (.6 + .4 * Math.sin(ph * .002 + i)) + amp * .2).toFixed(3)})`; lsKhatam(g, x, y, R * .035, -a * 2);
     }
-    /* motes drifting up, a few of them twinkling */
-    if (LS.motes) for (const m of LS.motes) {
-      m.y -= m.v * dt; if (m.y < -.02) { m.y = 1.02; m.x = Math.random(); }
-      const tw = m.tw ? Math.max(0, Math.sin(ph * .004 + m.p)) ** 6 : 0, a = (.22 + .5 * (.5 + .5 * Math.sin(ph * .002 + m.p))) * (night ? .9 : .6) + tw * .6 + amp * .2;
-      g.fillStyle = `rgba(${col},${Math.min(1, a).toFixed(3)})`; g.beginPath(); g.arc(m.x * w, m.y * h, m.r * u * (1 + tw * 1.5), 0, P2); g.fill();
+    lsMotes(g, c, dt);
+  }
+  /* 2 Ripples: rings of light leave the centre, one after another, and spread to the edge; a ring of sixteen soft lobes follows the waveform of the voice (the real samples when
+     they can be read, a gentle imitation otherwise) */
+  function lsBgRipples(g, c, dt) {
+    const { cx, cy, R, u, ph, amp, night, col } = c;
+    lsHalo(g, c, 1.1); lsMark(g, c);
+    g.lineJoin = "round"; g.lineCap = "round";
+    for (let k = 0; k < 8; k++) {
+      const f = ((ph * .000045 + k / 8) % 1), r = R * .14 + f * Math.max(c.w, c.h) * .5 * (1 + amp * .12), al = Math.pow(1 - f, 1.3) * (night ? .5 : .4) * (.6 + amp * 1.1);
+      g.lineWidth = (1.4 + (1 - f) * 1.6) * u; g.strokeStyle = `rgba(${col},${al.toFixed(3)})`; g.beginPath(); g.arc(cx, cy, r, 0, P2); g.stroke();
     }
+    const N = 128, base = R * (.3 + .02 * Math.sin(ph * .0012)), buf = LS.live && AN && AN.buf;
+    for (let pass = 0; pass < 2; pass++) {
+      g.beginPath();
+      for (let i = 0; i <= N; i++) {
+        const t = (i % N) / N, a = t * P2 - Math.PI / 2;
+        const s = buf ? (buf[Math.floor(t * (buf.length - 1))] - 128) / 128 : Math.sin(t * P2 * 8 + ph * .003) * .12 * (.4 + amp) + Math.sin(t * P2 * 16 - ph * .002) * .06 * amp;
+        const r = base * (1 + pass * .16) + s * R * (.22 - pass * .08) * (.5 + amp);
+        i ? g.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r) : g.moveTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r);
+      }
+      g.closePath(); g.lineWidth = (pass ? 1 : 2) * u; g.strokeStyle = `rgba(${col},${((night ? .6 : .5) * (pass ? .55 : 1) * (.6 + amp * .9)).toFixed(3)})`; g.stroke();
+    }
+    lsMotes(g, c, dt, .6);
+  }
+  /* 3 Night sky: three layers of stars drifting sideways at different speeds (plain dots), a thin crescent, and a warm glow along the horizon that rises with the voice */
+  function lsBgSky(g, c, dt) {
+    const { w, h, cx, cy, R, u, ph, amp, night, col } = c;
+    const hg = g.createRadialGradient(cx, h * 1.02, 0, cx, h * 1.02, Math.max(w, h) * .85);
+    hg.addColorStop(0, `rgba(${col},${((night ? .3 : .22) + amp * .22).toFixed(3)})`); hg.addColorStop(.5, `rgba(${col},${((night ? .1 : .075) + amp * .06).toFixed(3)})`); hg.addColorStop(1, `rgba(${col},0)`);
+    g.fillStyle = hg; g.fillRect(0, 0, w, h);
+    lsHalo(g, c, .6); lsMark(g, c);
+    if (LS.stars) for (const s of LS.stars) {
+      s.x -= s.v * dt; if (s.x < -.01) { s.x = 1.01; s.y = Math.random() * .96; }
+      const tw = .5 + .5 * Math.sin(ph * s.f + s.p), a = (night ? .35 + .65 * tw : .42 + .5 * tw) * (.5 + s.z * .5) + amp * .25 * s.z;
+      g.fillStyle = `rgba(${col},${Math.min(1, a).toFixed(3)})`; g.beginPath(); g.arc(s.x * w, s.y * h, s.r * u * (night ? 1 : 1.25) * (1 + amp * .35), 0, P2); g.fill();
+    }
+    const mx = w * .82, my = h * .17, mr = Math.min(w, h) * .1, rot = -.5;   // the crescent: a circle with another bitten out of it
+    g.save(); g.translate(mx, my); g.rotate(rot); g.lineWidth = 1.5 * u; g.strokeStyle = `rgba(${col},${((night ? .6 : .5) + amp * .2).toFixed(3)})`;
+    g.beginPath(); g.arc(0, 0, mr, Math.PI * .22, Math.PI * 1.78); g.arc(mr * .38, 0, mr * .82, Math.PI * 1.62, Math.PI * .38, true); g.closePath(); g.stroke();
+    g.fillStyle = `rgba(${col},${((night ? .22 : .16) + amp * .1).toFixed(3)})`; g.fill(); g.restore();
+    lsMotes(g, c, dt, .35);
+  }
+  /* 4 Aurora: big soft lights drifting on slow loops, and three flowing ribbons that swell with the voice */
+  function lsBgAurora(g, c, dt) {
+    const { w, h, cx, cy, R, u, ph, amp, night, col } = c, col2 = night ? "110,190,170" : "46,128,116";
+    lsHalo(g, c, .7);
+    const blobs = [[col, .28, .32, .0005, .0007, .62, 1], [col2, .72, .4, .0006, .0004, .55, 1.2], [col, .5, .78, .0004, .0006, .5, .8], [col2, .22, .68, .0007, .0005, .42, 1.5]];
+    blobs.forEach(([cc, bx, by, sx, sy, rr, k], i) => {
+      const x = (bx + .12 * Math.sin(ph * sx + i * 2)) * w, y = (by + .1 * Math.cos(ph * sy + i * 3)) * h, r = Math.max(w, h) * rr * (1 + amp * .1);
+      const gr = g.createRadialGradient(x, y, 0, x, y, r), a = ((night ? .15 : .19) + amp * .1) * k;
+      gr.addColorStop(0, `rgba(${cc},${a.toFixed(3)})`); gr.addColorStop(1, `rgba(${cc},0)`); g.fillStyle = gr; g.fillRect(0, 0, w, h);
+    });
+    lsMark(g, c);
+    g.lineJoin = "round"; g.lineCap = "round";
+    for (let k = 0; k < 3; k++) {
+      const cc = k === 1 ? col2 : col, y0 = h * (.34 + k * .16), A = h * (.045 + amp * .07) * (1 + k * .25), f = (1.2 + k * .5) / w * 6.28;
+      g.beginPath();
+      for (let x = 0; x <= w; x += 8 * u) { const y = y0 + Math.sin(x * f + ph * (.0006 + k * .0002) + k * 2) * A + Math.sin(x * f * 2.3 - ph * .0004 + k) * A * .35; x ? g.lineTo(x, y) : g.moveTo(x, y); }
+      const lg = g.createLinearGradient(0, 0, w, 0); const a = (night ? .55 : .45) * (.7 + amp * .9);
+      lg.addColorStop(0, `rgba(${cc},0)`); lg.addColorStop(.5, `rgba(${cc},${a.toFixed(3)})`); lg.addColorStop(1, `rgba(${cc},0)`);
+      g.lineWidth = (2.4 - k * .4) * u; g.strokeStyle = lg; g.stroke();
+    }
+    lsMotes(g, c, dt, .8);
+  }
+  function lsDraw(dt) {
+    const g = lsCv.getContext("2d"), w = lsCv.width, h = lsCv.height; if (!w) return;
+    const night = root.classList.contains("night"), c = { w, h, cx: w / 2, cy: h / 2, R: Math.min(w, h) * .5, u: Math.max(1, w / 800), amp: LS.amp, ph: LS.phase, night, col: night ? "222,190,96" : "150,122,40" };
+    g.clearRect(0, 0, w, h);
+    [lsBgGirih, lsBgRipples, lsBgSky, lsBgAurora][LS.bg - 1](g, c, dt);
   }
   function lsLoop(now) {
     LS.raf = 0; if (!lsVis() || document.hidden) return;
     const dt = Math.min(64, now - (LS.last || now)); LS.last = now; const sp = LS.still ? 0 : LS.speed; LS.phase += dt * sp;
-    const lv = anLevel(), target = lv >= 0 ? lv : (A.on && !A.paused ? .18 + .14 * Math.sin(LS.phase * .003) : 0);
+    const lv = anLevel(); LS.live = lv >= 0; const target = lv >= 0 ? lv : (A.on && !A.paused ? .18 + .14 * Math.sin(LS.phase * .003) : 0);
     LS.amp += (target - LS.amp) * (target > LS.amp ? .35 : .08); if (LS.amp < .002) LS.amp = 0;
     lsEl.style.setProperty("--amp", LS.amp.toFixed(3)); lsDraw(dt * sp);
     if (sp > 0 || LS.amp > 0) LS.raf = requestAnimationFrame(lsLoop);

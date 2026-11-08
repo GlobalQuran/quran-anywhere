@@ -136,7 +136,7 @@ Set these in a `<script>` **before** `app.js` (or pass them as `?query` paramete
 | `window.GQ_API_URL = "…"` | Use another API base (`?api=`). |
 | `window.GQ_ASSETS = "…"` | Where mushaf glyph data and page fonts load from (default: the Global Quran CDN). |
 
-Other query parameters: `?theme=night`, `?tr=en.sahih`, `?font=amiri`, `?tabs=top|side|none`, `?player=0`, `?sidebar=1`. Shared links carry `?m=both|ar|tr|listen&t=<translation>` and, for `listen`, `&l=ar|both|tr&r=<reciter>&v=<translation voice>`: opening one shows the Listen stage with the same voices and starts the recitation at that verse (browsers that refuse sound until a tap wait for the first tap). Embeds and `?embed=1` never touch the address bar.
+Other query parameters: `?theme=night`, `?tr=en.sahih`, `?font=amiri`, `?tabs=top|side|none`, `?bg=1|2|3|4` (the Listen background: Girih, Ripples, Night sky, Aurora; Ripples by default), `?player=0`, `?sidebar=1`. Shared links carry `?m=both|ar|tr|listen&t=<translation>` and, for `listen`, `&l=ar|both|tr&r=<reciter>&v=<translation voice>`: opening one shows the Listen stage with the same voices and starts the recitation at that verse (browsers that refuse sound until a tap wait for the first tap). Embeds and `?embed=1` never touch the address bar.
 
 <details>
 <summary><strong>Clean <code>/2:255</code> links (optional)</strong></summary>
