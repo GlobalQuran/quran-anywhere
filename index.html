@@ -26,7 +26,7 @@ window.gq = window.gq || { _quran: [], setConfig: function (c) { window.GQ_LEGAC
 <meta name="theme-color" content="#1a2224">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Global Quran">
-<link rel="stylesheet" href="app.css?v=92">
+<link rel="stylesheet" href="app.css?v=94">
 </head>
 <body>
 <a class="skip" id="skip" href="#">Skip to the Quran text</a>
@@ -121,7 +121,7 @@ window.gq = window.gq || { _quran: [], setConfig: function (c) { window.GQ_LEGAC
               <svg viewBox="0 0 24 24" class="i-s2"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg>
             </button>
           </div>
-          <div class="ls-paused" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="6" y="5" width="4" height="14" rx="1.2"/><rect x="14" y="5" width="4" height="14" rx="1.2"/></svg><span>Paused</span></div>
+          <div class="ls-paused" aria-hidden="true"><svg viewBox="0 0 24 24" class="lp-pause"><rect x="6" y="5" width="4" height="14" rx="1.2"/><rect x="14" y="5" width="4" height="14" rx="1.2"/></svg><svg viewBox="0 0 24 24" class="lp-play"><path d="M8 5.2v13.6a1 1 0 0 0 1.5.86l11-6.8a1 1 0 0 0 0-1.72l-11-6.8A1 1 0 0 0 8 5.2z"/></svg><span>Paused</span></div>
         </div>
         <!-- reading modes: a note pinned on the book (landing page, or from the gear); built from MODES in app.js -->
         <div class="modes" id="modes" role="region" aria-labelledby="modesT" hidden>
@@ -274,7 +274,7 @@ window.gq = window.gq || { _quran: [], setConfig: function (c) { window.GQ_LEGAC
 <audio id="audio" preload="none" crossorigin="anonymous"></audio>
 <script src="gq-api.js?v=3"></script>
 <script src="analytics.js?v=2"></script>
-<script src="app.js?v=91"></script>
+<script src="app.js?v=94"></script>
 <script src="site.js?v=11"></script>
 </body>
 </html>

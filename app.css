@@ -576,7 +576,8 @@ html.night .ls-b { color: var(--accent); }
 .ls-b svg { width: 18px; height: 18px; fill: currentColor; } .ls-b:hover { background: rgba(165,138,58,.16); }
 .ls-paused { position: absolute; z-index: 2; left: 50%; top: 50%; transform: translate(-50%, -50%); display: none; flex-direction: column; align-items: center; gap: 8px; padding: 16px 24px; border-radius: 16px; background: rgba(20,26,26,.46); color: #fff; font: 700 13px var(--ui); letter-spacing: .18em; text-transform: uppercase; pointer-events: none; backdrop-filter: blur(3px); }
 .ls-paused svg { width: 38px; height: 38px; fill: #fff; }
-.lstage.paused .ls-paused { display: flex; animation: ls-in .3s ease; } .lstage.paused .ls-text { opacity: .35; filter: blur(1.5px); } @keyframes ls-in { from { opacity: 0; } }
+.lstage.paused .ls-paused, .lstage.idle .ls-paused { display: flex; animation: ls-in .3s ease; } .lstage.paused .ls-text, .lstage.idle .ls-text { opacity: .35; filter: blur(1.5px); }
+.ls-paused .lp-play { display: none; } .lstage.idle .ls-paused .lp-play { display: block; } .lstage.idle .ls-paused .lp-pause { display: none; }   /* nothing playing yet (a fresh load or a reload): the same card, with a play mark and "Tap to play" */ @keyframes ls-in { from { opacity: 0; } }
 @media (max-width: 720px) { .ls-ctl { gap: 16px; } .ls-b { width: 38px; height: 38px; } }
 @media (prefers-reduced-motion: reduce) { .ls-text { transition: opacity .2s; } .lstage.playing .ls-eq b { animation: none; } }
 
@@ -831,3 +832,8 @@ html.ls-full .ls-ctl .ls-fs { opacity: 0; pointer-events: none; transition: opac
 html.ls-full .lstage.reveal .ls-ctl .ls-fs { opacity: 1; pointer-events: auto; }
 html.ls-full .ls-ctl .ls-share { opacity: .78; pointer-events: auto; transition: opacity .5s ease; }
 html.ls-full .lstage.reveal .ls-ctl .ls-share, html.ls-full .ls-ctl .ls-share:hover, html.ls-full .ls-ctl .ls-share:focus-visible { opacity: 1; }
+
+/* a tap anywhere on the Listen stage plays / pauses it, so the whole stage (the verse text and the Paused / Tap to play card included) shows the pointing hand, not the text cursor */
+.lstage, .lstage .ls-text, .lstage .ls-text * , .lstage .ls-paused { cursor: pointer; }
+.lstage .ls-text .num { cursor: pointer; }
+html.ls-full .lstage:not(.reveal), html.ls-full .lstage:not(.reveal) * { cursor: none; }
