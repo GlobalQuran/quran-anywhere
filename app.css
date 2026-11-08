@@ -656,22 +656,28 @@ html.night .modes { background: linear-gradient(#36423f, #2e3938); color: #e9efe
 .modes .modes-x { position: absolute; top: 6px; right: 6px; width: 30px; height: 30px; }
 .modes-h { margin: 0 28px 12px; text-align: center; font: 700 19px/1.2 var(--brand); }
 .modes-chips { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.modes-chips[hidden] { display: none; }   /* a mode with choices replaces the tiles (the display: grid above would otherwise beat the hidden attribute) */
+.modes.sub-open .modes-note, .modes.sub-open .modes-bism { display: none; }
+.modes.sub-open .modes-h { margin-top: 6px; font-size: 21px; }
 .mchip { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 10px 6px 9px; border: 1px solid var(--line); border-radius: 10px; background: rgba(255,255,255,.55); color: inherit; font: inherit; cursor: pointer; text-align: center; transition: border-color .15s, background .15s, transform .15s; }
 html.night .mchip { background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.16); }
 .mchip:hover { border-color: var(--gold); transform: translateY(-1px); } .mchip[aria-expanded="true"] { border-color: var(--gold); background: rgba(165,138,58,.16); }
 .mchip svg { width: 26px; height: 26px; fill: none; stroke: var(--cite); stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; } html.night .mchip svg { stroke: var(--accent); }
 .mchip b { font: 700 14px var(--ui); } .mchip small { font: 12px/1.25 var(--ui); color: var(--tr-ink); } html.night .mchip small { color: #b9c1bf; }
 .mchip.cur::after { content: ""; width: 6px; height: 6px; margin-top: 2px; border-radius: 50%; background: var(--gold); }
-.modes-sub { margin-top: 10px; display: grid; gap: 6px; animation: modes-sub .25s ease; } .modes-sub[hidden] { display: none; }
+.modes-sub { margin-top: 4px; display: grid; gap: 8px; animation: modes-sub .25s ease; } .modes-sub[hidden] { display: none; }
 @keyframes modes-sub { from { opacity: 0; transform: translateY(-4px); } }
-.msub-back { justify-self: start; display: inline-flex; align-items: center; gap: 4px; padding: 6px 10px 6px 6px; border: 0; background: none; color: var(--cite); font: 700 13px var(--ui); cursor: pointer; border-radius: 8px; } .msub-back:hover { background: rgba(165,138,58,.14); }
+.msub-back { position: absolute; top: 10px; left: 10px; display: inline-flex; align-items: center; gap: 4px; height: 30px; padding: 0 12px 0 6px; border: 1px solid var(--line); border-radius: 15px; background: var(--ctl-bg); color: var(--cite); font: 600 12.5px var(--ui); cursor: pointer; transition: background var(--t), border-color var(--t); } .msub-back:hover { background: var(--ctl-hover); border-color: var(--gold); }
 .msub-back svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.msub-h { margin: 2px 0 2px; font: 700 15px var(--ui); }
-.msub { display: block; width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: rgba(255,255,255,.5); color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.msub-h { margin: 0 0 8px; text-align: center; font: 500 13px/1.4 var(--ui); color: var(--tr-ink); } html.night .msub-h { color: #b9c1bf; }
+.msub { position: relative; display: block; width: 100%; padding: 12px 14px 12px 52px; border: 1px solid var(--line); border-radius: 12px; background: rgba(255,255,255,.55); color: inherit; font: inherit; text-align: left; cursor: pointer; transition: border-color var(--t), background var(--t), transform var(--t); }
+.msub svg { position: absolute; left: 14px; top: 14px; width: 26px; height: 26px; fill: none; stroke: var(--cite); stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; } html.night .msub svg { stroke: var(--accent); }
+.msub.cur { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold) inset; } .msub.cur::after { content: ""; position: absolute; right: 14px; top: 16px; width: 8px; height: 8px; border-radius: 50%; background: var(--gold); }
+.msub:hover { transform: translateY(-1px); }
 html.night .msub { background: rgba(255,255,255,.05); border-color: rgba(255,255,255,.14); } .msub:hover { border-color: var(--gold); background: rgba(165,138,58,.12); }
 .msub b { display: flex; align-items: center; gap: 8px; font: 700 14px var(--ui); } .msub span { display: block; margin-top: 3px; font: 13px/1.45 var(--ui); color: var(--tr-ink); } html.night .msub span { color: #b9c1bf; }
 .msub em { font: 700 10.5px var(--ui); letter-spacing: .06em; text-transform: uppercase; font-style: normal; color: var(--cite); border: 1px solid currentColor; border-radius: 9px; padding: 1px 7px; } html.night .msub em { color: var(--accent); }
-@media (max-width: 560px) { .modes-chips { grid-template-columns: repeat(2, 1fr); } .modes-h { font-size: 17px; } .modes { padding: 18px 12px 12px; } }
+@media (max-width: 560px) { .modes-chips { grid-template-columns: repeat(2, 1fr); } .modes-h { font-size: 17px; } .modes { padding: 18px 12px 12px; } .modes.sub-open { padding-top: 46px; } .msub { padding-left: 46px; } .msub svg { left: 11px; width: 24px; height: 24px; } }
 @media (prefers-reduced-motion: reduce) { .modes, .modes-sub { animation: none; } }
 html.ls-focus .modes { display: none; }
 

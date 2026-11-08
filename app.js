@@ -1240,11 +1240,15 @@
     lsDraw(0);
   }
   const P2 = Math.PI * 2;
-  function lsStar(g, cx, cy, r, n, step, rot) {   // the {n/step} star polygon: every vertex joined to the one `step` further round
-    g.beginPath();
-    for (let i = 0; i < n; i++) { const a = rot + i * P2 / n, b = rot + ((i + step) % n) * P2 / n; g.moveTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r); g.lineTo(cx + Math.cos(b) * r, cy + Math.sin(b) * r); }
-    g.stroke();
+  function lsPetals(g, cx, cy, r0, r1, n, rot) {   // n pointed-arch petals between radii r0 and r1 (the shamsa of illuminated manuscripts)
+    const P = (r, a) => [cx + Math.cos(a) * r, cy + Math.sin(a) * r], half = Math.PI / n * .86, d = r1 - r0;
+    for (let i = 0; i < n; i++) {
+      const a = rot + i * P2 / n, st = P(r0, a); g.beginPath(); g.moveTo(...st);
+      g.bezierCurveTo(...P(r0 + d * .3, a - half * 1.05), ...P(r0 + d * .72, a - half * .55), ...P(r1, a));
+      g.bezierCurveTo(...P(r0 + d * .72, a + half * .55), ...P(r0 + d * .3, a + half * 1.05), ...st); g.stroke();
+    }
   }
+  function lsOctagon(g, cx, cy, r, rot) { g.beginPath(); for (let i = 0; i <= 8; i++) { const a = rot + i * Math.PI / 4, x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r; i ? g.lineTo(x, y) : g.moveTo(x, y); } g.stroke(); }
   function lsKhatam(g, cx, cy, r, rot) {   // a small eight-pointed star: two squares
     g.beginPath(); for (let k = 0; k < 2; k++) for (let i = 0; i <= 4; i++) { const a = rot + k * Math.PI / 4 + i * Math.PI / 2, x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r; i ? g.lineTo(x, y) : g.moveTo(x, y); } g.stroke();
   }
@@ -1259,27 +1263,30 @@
     g.fillStyle = gr; g.fillRect(0, 0, w, h);
     /* light rays, turning very slowly */
     g.save(); g.translate(cx, cy); g.rotate(ph * .000012);
-    for (let i = 0; i < 28; i++) {
-      const a = i * P2 / 28, wd = .018 + .012 * Math.sin(ph * .0007 + i), al = (night ? .05 : .035) + amp * .06 * (.5 + .5 * Math.sin(ph * .003 + i * 1.7));
+    for (let i = 0; i < 32; i++) {
+      const a = i * P2 / 32, wd = .018 + .012 * Math.sin(ph * .0007 + i), al = (night ? .05 : .035) + amp * .06 * (.5 + .5 * Math.sin(ph * .003 + i * 1.7));
       const rg = g.createLinearGradient(0, 0, Math.cos(a) * R * 1.6, Math.sin(a) * R * 1.6); rg.addColorStop(0, `rgba(${col},${al.toFixed(3)})`); rg.addColorStop(1, `rgba(${col},0)`);
       g.fillStyle = rg; g.beginPath(); g.moveTo(0, 0); g.arc(0, 0, R * 1.6, a - wd, a + wd); g.closePath(); g.fill();
     }
     g.restore();
     /* the surah's name in calligraphy, as a watermark behind everything */
-    if (LS.s && document.fonts && document.fonts.check("20px SurahNames")) { g.save(); g.font = `${Math.round(R * .8)}px SurahNames`; g.textAlign = "center"; g.textBaseline = "middle"; g.fillStyle = `rgba(${col},${((night ? .075 : .06) + amp * .04).toFixed(3)})`; g.fillText(pad3(LS.s), cx, cy); g.restore(); }
-    /* girih rings: interlaced star polygons turning against each other */
+    if (LS.s && document.fonts && document.fonts.check("20px SurahNames")) { g.save(); g.font = `${Math.round(R * .9)}px SurahNames`; g.textAlign = "center"; g.textBaseline = "middle"; g.fillStyle = `rgba(${col},${((night ? .1 : .085) + amp * .05).toFixed(3)})`; g.fillText(pad3(LS.s), cx, cy); g.restore(); }
+    /* the shamsa: rings of pointed-arch petals (8, 16, 24 … never a count that reads as six-fold) turning against each other, breathing with the voice */
     g.lineJoin = "round"; g.lineCap = "round";
-    const rings = [[.2, 8, 3, -1], [.34, 16, 6, 1], [.5, 16, 5, -1], [.68, 24, 9, 1], [.88, 32, 13, -1]];
-    rings.forEach(([f, n, st, dir], k) => {
-      const r = R * f * (1 + .02 * Math.sin(ph * .0009 + k) + amp * .03), al = ((night ? .26 : .22) - k * .035) * (.75 + amp * .5);
-      g.lineWidth = (k === 1 || k === 3 ? 1.3 : .9) * u; g.strokeStyle = `rgba(${col},${al.toFixed(3)})`;
-      lsStar(g, cx, cy, r, n, st, ph * .00005 * dir * (1 + k * .12) + k * .3);
-      g.lineWidth = .7 * u; g.strokeStyle = `rgba(${col},${(al * .5).toFixed(3)})`; g.beginPath(); g.arc(cx, cy, r, 0, P2); g.stroke();
+    const rings = [[.14, .3, 8, -1], [.3, .5, 16, 1], [.48, .72, 16, -1], [.68, .94, 32, 1]];
+    rings.forEach(([a0, a1, n, dir], k) => {
+      const sw = 1 + .02 * Math.sin(ph * .0009 + k) + amp * .03, al = ((night ? .26 : .22) - k * .04) * (.75 + amp * .5);
+      g.lineWidth = (k % 2 ? 1.2 : .9) * u; g.strokeStyle = `rgba(${col},${al.toFixed(3)})`;
+      lsPetals(g, cx, cy, R * a0 * sw, R * a1 * sw, n, ph * .00005 * dir * (1 + k * .12) + k * .2);
+      g.lineWidth = .7 * u; g.strokeStyle = `rgba(${col},${(al * .5).toFixed(3)})`; g.beginPath(); g.arc(cx, cy, R * a1 * sw, 0, P2); g.stroke();
     });
-    /* a ring of small khatams orbiting between the middle rings */
-    for (let i = 0; i < 12; i++) {
-      const a = ph * .00004 + i * P2 / 12, r = R * .59, x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r;
-      g.lineWidth = .9 * u; g.strokeStyle = `rgba(${col},${Math.min(1, (night ? .3 : .24) * (.6 + .4 * Math.sin(ph * .002 + i)) + amp * .2).toFixed(3)})`; lsKhatam(g, x, y, R * .035, -a * 2);
+    /* the centre: an eight-pointed medallion (two squares and an octagon, the rub el hizb) */
+    const mr = R * .11 * (1 + amp * .06), ma = (night ? .32 : .26) * (.7 + amp * .6);
+    g.lineWidth = 1.1 * u; g.strokeStyle = `rgba(${col},${ma.toFixed(3)})`; lsKhatam(g, cx, cy, mr, ph * .00003); g.lineWidth = .8 * u; lsOctagon(g, cx, cy, mr * .62, Math.PI / 8 - ph * .00003);
+    /* a ring of sixteen small khatams orbiting between the outer rings */
+    for (let i = 0; i < 16; i++) {
+      const a = ph * .00004 + i * P2 / 16, r = R * .6, x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r;
+      g.lineWidth = .9 * u; g.strokeStyle = `rgba(${col},${Math.min(1, (night ? .3 : .24) * (.6 + .4 * Math.sin(ph * .002 + i)) + amp * .2).toFixed(3)})`; lsKhatam(g, x, y, R * .03, -a * 2);
     }
     /* motes drifting up, a few of them twinkling */
     if (LS.motes) for (const m of LS.motes) {
@@ -1330,9 +1337,11 @@
   function drawModes() {
     const cur = mTop(mCur());
     mChips.innerHTML = MODES.map(m => `<button type="button" class="mchip${m.id === cur ? " cur" : ""}" data-m="${m.id}"${m.subs ? ` aria-expanded="${mOpen === m.id}" aria-controls="modesSub"` : ""}><svg viewBox="0 0 24 24" aria-hidden="true">${MICON[m.id]}</svg><b>${esc(m.name)}</b><small>${esc(m.hint)}</small></button>`).join("");
-    const m = MODES.find(x => x.id === mOpen);
-    mChips.hidden = !!m;   // a mode with choices replaces the four options, so it is clear a choice is still to be made
-    mSub.hidden = !m; mSub.innerHTML = m ? `<button type="button" class="msub-back" data-back="1"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>All modes</button><h3 class="msub-h">${esc(m.name)}: choose one</h3>` + m.subs.map(s => `<button type="button" class="msub" data-s="${s.id}"><b>${esc(s.name)}${s.def ? "<em>Default</em>" : ""}</b><span>${esc(s.text)}</span></button>`).join("") : "";
+    const m = MODES.find(x => x.id === mOpen), now = mCur();
+    /* a mode with choices takes the whole note: the tiles and the intro go, the heading becomes the mode's name, "All modes" leads back */
+    mChips.hidden = !!m; modesEl.classList.toggle("sub-open", !!m);
+    $("#modesT").textContent = m ? m.name : "How would you like to read today?";
+    mSub.hidden = !m; mSub.innerHTML = m ? `<button type="button" class="msub-back" data-back="1"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>All modes</button><p class="msub-h">Choose one. You can change any of it afterwards in the options.</p>` + m.subs.map(s => `<button type="button" class="msub${s.id === now ? " cur" : ""}" data-s="${s.id}"${s.id === now ? ' aria-current="true"' : ""}><svg viewBox="0 0 24 24" aria-hidden="true">${MICON[m.id]}</svg><b>${esc(s.name)}${s.def ? "<em>Default</em>" : ""}</b><span>${esc(s.text)}</span></button>`).join("") : "";
   }
   function showModes(on, focus) {
     modesEl.hidden = !on; if (!on) { mOpen = ""; return; }
