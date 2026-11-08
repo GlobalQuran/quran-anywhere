@@ -65,8 +65,8 @@
       history.replaceState(null, "", location.origin + (urlMode() === "path" ? baseFolder() + s + ":" + n + q : (new URL(document.baseURI).origin === location.origin ? DOCBASE : location.pathname) + q + "#" + s + ":" + n));
     } catch (e) {}
   }
-  /* Mushaf glyph data and page fonts are hosted on the DigitalOcean Space behind audio.globalquran.com: {ASSETS}/quran_data/qcf/<surah>.json and {ASSETS}/fonts/qcf/... (the five small fonts in app.css are local). Override with window.GQ_ASSETS. */
-  const ASSETS = String(window.GQ_ASSETS || "https://audio.globalquran.com").replace(/\/$/, "");
+  /* Mushaf glyph data and page fonts are hosted in the Cloudflare R2 assets bucket behind cdn.globalquran.com: {ASSETS}/quran_data/qcf/<surah>.json and {ASSETS}/fonts/qcf/... (the five small fonts in app.css are local). Override with window.GQ_ASSETS. */
+  const ASSETS = String(window.GQ_ASSETS || "https://cdn.globalquran.com").replace(/\/$/, "");
   function parseRoute(raw) {
     const parts = String(raw || "").replace(/^\/+|\/+$/g, "").split("/").filter(Boolean); if (!parts.length) return null;
     if (parts[0] === "search") return { search: parts.slice(1).join("/"), eds: [] };
@@ -1170,7 +1170,7 @@
   const LS = { openAt: 0, tok: 0, key: "", raf: 0, last: 0, phase: 0, speed: .3, amp: 0, motes: null, still: matchMedia("(prefers-reduced-motion: reduce)").matches };
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   const lsVis = () => S.view === "listen" && S.mode !== "saved" && !!S.data;
-  function lsVisibility() { lsEl.hidden = !lsVis(); if (lsVis()) { lsSize(); lsKick(); } else { cancelAnimationFrame(LS.raf); LS.raf = 0; } }
+  function lsVisibility() { lsEl.hidden = !lsVis(); if (lsVis()) { lsSize(); lsKick(); } else { cancelAnimationFrame(LS.raf); LS.raf = 0; } if (typeof lsWake === "function") lsWake(); }
   async function lsArabicHtml(s, n) {
     if (n === 0) return { html: bismHtml(), cls: qcfOn(1) && QC.on ? "qcf" : "" };
     if (QC.on) { try { await loadQcf(s); } catch (e) {} }
@@ -1223,11 +1223,26 @@
     if (root.classList.contains("mt-tuck") === hide) return;
     root.classList.toggle("mt-tuck", hide); if (hide && typeof mtClose === "function") mtClose(); setTimeout(() => recalc(), 300);
   }
+  /* the screen stays awake while Listen is playing (people read along while they listen): the Screen Wake Lock, released when it is paused, stopped or left.
+     The browser drops the lock whenever the page is hidden, so it is asked for again when the page comes back. Browsers without it just behave as before. */
+  const WAKE = { lock: null, want: false, busy: false };
+  async function lsWake() {
+    WAKE.want = lsVis() && A.on && !A.paused;
+    if (!("wakeLock" in navigator) || WAKE.busy) return;   // one request at a time; it looks again when it lands
+    WAKE.busy = true; const asked = WAKE.want;
+    try {
+      if (WAKE.want && !WAKE.lock && !document.hidden) { const l = await navigator.wakeLock.request("screen"); WAKE.lock = l; l.addEventListener("release", () => { if (WAKE.lock === l) WAKE.lock = null; }); }
+      else if (!WAKE.want && WAKE.lock) { const l = WAKE.lock; WAKE.lock = null; await l.release(); }
+    } catch (e) {}
+    WAKE.busy = false;
+    if (WAKE.want !== asked) lsWake();   // what is wanted changed while it was busy
+  }
   function lsState() {
     const playing = A.on && !A.paused; lsText.setAttribute("aria-live", A.on ? "off" : "polite");   // don't read the verse aloud over the recitation
     lsEl.classList.toggle("playing", playing); lsEl.classList.toggle("paused", A.on && A.paused); lsEl.classList.toggle("idle", !A.on);
     LS.speed = !A.on ? .3 : A.paused ? 0 : 1; if (lsVis()) lsKick();
-    lsTabs();
+    { const sp = $(".ls-paused span"); if (sp) { if (!A.on) sp.textContent = "Tap to play"; else if (sp.textContent === "Tap to play") sp.textContent = "Paused"; } }
+    lsTabs(); lsWake();
   }
   function lsAfterOpen(ayah) { if (!lsVis()) return; LS.openAt = Date.now(); LS.key = ""; LS.first = true; A.on ? lsStage() : lsIdle(ayah || 1); }
   $("#lsShare").onclick = () => shareAyah(LS.s || S.s, Math.max(1, LS.n || S.cur || 1));   // shares what is on the stage, in the voices it is playing
@@ -1357,7 +1372,7 @@
   const plKick = () => { if (!plRaf) plRaf = requestAnimationFrame(plLoop); };
   ["play", "pause", "ended"].forEach(ev => audio.addEventListener(ev, plKick));
   new ResizeObserver(() => { if (lsVis()) { lsSize(); lsFit(); } }).observe(lsEl);
-  document.addEventListener("visibilitychange", () => { if (!document.hidden && lsVis()) lsKick(); });
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) { if (lsVis()) lsKick(); lsWake(); } });
   new MutationObserver(() => lsDraw(0)).observe(root, { attributes: true, attributeFilter: ["class"] });   // day / night: redraw at once, even while paused
 
 
