@@ -428,7 +428,13 @@
     const d = { ArrowUp: -1, ArrowDown: 1, PageUp: -10, PageDown: 10 }[e.key];
     if (d) { e.preventDefault(); jumpAyah(S.cur + d); } else if (e.key === "Home") { e.preventDefault(); jumpAyah(1); } else if (e.key === "End") { e.preventDefault(); jumpAyah(S.count); }
   });
-  new ResizeObserver(() => { if (S.data) { recalc(); fitName(); } }).observe(scroller);
+  /* a new width (rotating a phone, opening the sidebar, resizing the window) reflows the text: keep the reader on the ayah it was at, not on a pixel offset */
+  let lastW = 0;
+  new ResizeObserver(() => {
+    if (!S.data) return; const w = scroller.clientWidth, cur = S.curS === S.s ? S.cur : 0; recalc(); fitName();
+    if (lastW && w !== lastW && cur > 0 && !S.jump && !sm.raf && S.mode !== "saved") { scroller.scrollTop = ayahTop(cur); LZ.last = scroller.scrollTop; scheduleRealize(); }
+    lastW = w;
+  }).observe(scroller);
   new ResizeObserver(() => fitName()).observe($("#cart"));
   if (document.fonts) document.fonts.addEventListener("loadingdone", () => { if (S.data) { recalc(); fitName(); } });
 
@@ -684,6 +690,7 @@
   }
   function playAyah(n, s = S.s, queue = null, qi = 0) {
     clearTimeout(A.simT); n = n === 0 ? 0 : clamp(n, 1, meta(s).c); if (!queue && n <= 1) markBism(s); const wasOff = !A.on; A.on = true; A.paused = false; A.s = s; A.n = n; A.q = queue; A.qi = qi; A.sim = 0; A.st = stagesNow(); A.stage = 0;
+    if (wasOff && modesOn()) putAwayModes();   // the note must not sit over the verse being recited
     if (wasOff) { A.played = 0; A.t0 = Date.now(); stat("play_start", { surah: s, ref: n > 0 ? s + ":" + n : "", from: queue ? "saved" : n === 0 ? "bismillah" : n === 1 ? "start" : "ayah", voices: A.st.join("+"), reciter: A.reciter, view: S.view, show: S.view === "read" ? S.rd : "both" }); }
     if (S.view === "read" && !queue) { $$(".ayah.sel").forEach(e => e.classList.remove("sel")); S.sel = 0; }
     else if (S.view === "verse" && !queue && s === S.s && n >= 1 && S.sel !== n && $("#a" + n, inner)) selectAyah(n, true);   // the buttons follow the verse being played   // the click selection has done its job
@@ -1045,7 +1052,7 @@
   addEventListener("keydown", e => {
     if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey || e.isComposing) return;
     const t = e.target, k = e.key, key = k.length === 1 ? k.toLowerCase() : k;
-    if (t.closest && t.closest("input, select, textarea, [contenteditable=''], [contenteditable='true']")) return;   // never take keys away from typing
+    if (t.closest && t.closest("input, select, textarea, [contenteditable=''], [contenteditable='true']")) { if (key !== "Escape" || (t.type === "search" && t.value)) return; t.blur(); }   // never take keys away from typing; Esc in an empty search box closes the panel it is in (a box with text is cleared by the browser first)
     const help = key === "?" || (key === "/" && e.shiftKey);   // "?" is Shift + / on most keyboards
     if (kbdOpen()) { if (key === "Escape" || help) { e.preventDefault(); closeKbd(); } else if (key === "Tab") trapTab(e, kbdEl); return; }
     if (!$("#oops").hidden || !$("#privacy").hidden) return;
@@ -1350,5 +1357,14 @@
     if (EMBED) parent.postMessage({ source: "globalquran", type: "ready" }, "*");
     if (document.fonts) document.fonts.ready.then(() => recalc());
   }
+  /* the address changed in place (a typed #2:255, a link on this page, the back / forward buttons): open that place. The reader writes places with replaceState, which fires nothing, so only outside changes arrive here. */
+  async function onAddress() {
+    if (EMBED || !S.data || urlMode() === "off") return;
+    const r = readAddress(); if (!r.s && !r.page) return;
+    let s = r.s || 0, a = r.a || 1; if (r.page) { try { [s, a] = await pageStart(r.page); } catch (e) { return; } }
+    s = clamp(s, 1, 114); a = clamp(a, 1, meta(s).c);
+    if (s !== S.s || S.mode === "saved") openSurah(s, a, { via: "link" }); else if (a !== (S.cur || 1)) jumpAyah(a, { smooth: true });
+  }
+  addEventListener("hashchange", onAddress); addEventListener("popstate", onAddress);
   init();
 })();
