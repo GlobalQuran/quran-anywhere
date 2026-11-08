@@ -285,7 +285,7 @@
     el.style.fontSize = Math.min(100 * btn.clientWidth * .9 / r.width, 100 * cart.clientHeight * .74 / r.height, 70) + "px";
   }
   const ayahHtml = (s, n, text) => `<div class="ayah" id="a${n}" data-n="${n}" role="group" aria-label="Verse ${n}"><div class="ar${qcfOn(s) ? " tmp" : ""}" lang="ar" data-m="${qcfOn(s) ? "q" : "t"}">${arLine(s, n, text)}</div><div class="tlit"></div><div class="trs"></div>
-      <div class="actions"><button data-act="play"><svg><use href="img/sprite.svg#i-play"/></svg>Play from here</button><button data-act="mark" aria-pressed="false"><svg><use href="img/sprite.svg#i-star"/></svg>Save</button><button data-act="copy"><svg><use href="img/sprite.svg#i-copy"/></svg>Copy</button><button data-act="share"><svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><path d="M8.3 10.8l7.4-4.3M8.3 13.2l7.4 4.3"/></svg>Share</button></div></div>`;
+      <div class="actions"><button data-act="play"><svg><use href="img/sprite.svg#i-play"/></svg>Play from here</button><button data-act="mark" aria-pressed="false"><svg><use href="img/sprite.svg#i-star"/></svg>Save</button><button data-act="copy"><svg><use href="img/sprite.svg#i-copy"/></svg>Copy</button><button data-act="share"><svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 11.5L13.5 5v3.5C8 9 4.8 12.4 3.8 18.8c2.6-3.3 5.8-4.6 9.7-4.6v3.5z"/></svg>Share</button></div></div>`;
 
   /* ---------- render a surah ---------- */
   function renderSurah(n) {
@@ -366,7 +366,7 @@
     store.set("pos", S.s + ":" + n);
     if (EMBED) parent.postMessage({ source: "globalquran", type: "ayah", surah: S.s, ayah: n }, "*");
   }
-  scroller.addEventListener("scroll", () => { onScroll(); const t = scroller.scrollTop; if (Math.abs(t - LZ.last) > 2) { LZ.dir = t > LZ.last ? 1 : -1; LZ.last = t; } scheduleRealize(); }, { passive: true });
+  scroller.addEventListener("scroll", () => { if (!vpop.hidden) closeVpop(); onScroll(); const t = scroller.scrollTop; if (Math.abs(t - LZ.last) > 2) { LZ.dir = t > LZ.last ? 1 : -1; LZ.last = t; } scheduleRealize(); }, { passive: true });
 
   /* ---------- smooth scrolling (speed follows how far / how fast the target moves) ---------- */
   const sm = { target: 0, raf: 0, boost: 0 };
@@ -449,7 +449,9 @@
     renderSurah(n); closeMenu(); lsAfterOpen(ayah); PROG.s = n; PROG.got = 0; PROG.at = Date.now(); if (["sidebar", "picker", "arrows", "end_button", "keyboard"].includes(opts.via) && modesOn()) putAwayModes(); stat("surah_open", { surah: n, via: opts.via || "load", view: S.view });
     S.cur = 0; S.curS = 0;
     requestAnimationFrame(() => { recalc();
-      ayah > 1 ? jumpAyah(ayah, { smooth: false, flash: opts.flash !== false }) : (scroller.scrollTop = 0); LZ.last = scroller.scrollTop; LZ.dir = 1; updateCurrent(); realizeWindow(); });
+      ayah > 1 ? jumpAyah(ayah, { smooth: false, flash: opts.flash !== false }) : (scroller.scrollTop = 0);
+      if (ayah > 1 && S.view === "verse" && ["start", "link"].includes(opts.via) && $("#a" + ayah, inner)) selectAyah(ayah, true);   // arriving by a link: the verse is chosen and its buttons are showing
+      LZ.last = scroller.scrollTop; LZ.dir = 1; updateCurrent(); realizeWindow(); });
     const cur = $("#surahList button.cur"); if (cur && !opts.noList) cur.scrollIntoView({ block: "nearest" });
   }
   $("#btnPrevS").onclick = () => openSurah(S.s - 1, 1, { via: "arrows" }); $("#btnNextS").onclick = () => openSurah(S.s + 1, 1, { via: "arrows" });
@@ -465,7 +467,10 @@
       if (S.view === "read") { selectAyah(n, true); openVpop(nb, ay); return; }   // reading view: the number opens a little menu (play, save, copy, share)
       if (S.sel !== n) selectAyah(n, true); if (A.on && !A.paused) playAyah(n, S.s); return;   // only while it is actually playing: selecting never starts audio
     }
-    if (ay) selectAyah(+ay.dataset.n, S.view === "verse");   // verse by verse: the chosen verse stays chosen, with its buttons showing
+    if (ay) {
+      const n2 = +ay.dataset.n, was = S.sel === n2; selectAyah(n2, S.view === "verse");   // verse by verse: the chosen verse stays chosen, with its buttons showing
+      if (S.view === "read") { if (was) closeVpop(); else openVpop({ getBoundingClientRect: () => ({ left: e.clientX, width: 0, top: e.clientY - 8, bottom: e.clientY + 8 }) }, ay); }   // reading view: a chosen verse shows its buttons (Play, Save, Copy, Share) where it was touched, not only the number
+    }
   });
   /* the small menu on a verse number in the reading view */
   const vpop = document.createElement("div"); vpop.id = "vpop"; vpop.hidden = true; vpop.setAttribute("role", "menu"); document.body.appendChild(vpop);
@@ -476,7 +481,7 @@
       <button type="button" role="menuitem" data-act="play">${ic('<path d="M7 5l12 7-12 7z"/>')}Play</button>
       <button type="button" role="menuitem" data-act="mark">${ic('<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/>')}${saved ? "Saved" : "Save"}</button>
       <button type="button" role="menuitem" data-act="copy">${ic('<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/>')}Copy</button>
-      <button type="button" role="menuitem" data-act="share">${ic('<circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><path d="M8.3 10.8l7.4-4.3M8.3 13.2l7.4 4.3"/>')}Share</button></div>`;
+      <button type="button" role="menuitem" data-act="share">${ic('<path d="M20.5 11.5L13.5 5v3.5C8 9 4.8 12.4 3.8 18.8c2.6-3.3 5.8-4.6 9.7-4.6v3.5z"/>')}Share</button></div>`;
     vpop.hidden = false; vpop._ay = ay;
     const r = anchor.getBoundingClientRect(), W = vpop.offsetWidth, H = vpop.offsetHeight;
     vpop.style.left = clamp(r.left + r.width / 2 - W / 2, 8, innerWidth - W - 8) + "px";
@@ -527,13 +532,32 @@
     }
   }
   /* ---------- share a verse: the phone's own share sheet where there is one, else a small menu ---------- */
-  const verseLink = (s, n) => location.origin + (urlMode() === "path" ? baseFolder() + s + ":" + n : (new URL(document.baseURI).origin === location.origin ? DOCBASE : location.pathname) + "#" + s + ":" + n);
+  /* what a shared link remembers, in the same words the link-preview function reads: m = both | ar | tr (the page) or listen, t = the translation, and for listen
+     l = ar | both | tr (which voices) and r = the reciter. A link made from the Listen stage opens the Listen stage and starts the recitation from that verse. */
+  function shareParams() {
+    const p = {}, listen = S.view === "listen" && S.mode !== "saved", infos = trInfos();
+    let t;
+    if (listen) { const rec = TR_REC.find(x => x[0] === trRecId()); t = (rec && infos.find(i => i.lang === rec[1])) || infos[0]; } else t = infos[0];
+    if (t) p.t = t.id;
+    if (listen) { const st = stagesNow(); p.m = "listen"; p.l = st.length > 1 ? "both" : st[0]; if (st.includes("ar")) p.r = A.reciter || "ar.alafasy"; if (st.includes("tr")) p.v = trRecId(); }
+    else p.m = S.view === "read" ? (S.rd === "tr" ? "tr" : "ar") : "both";
+    return p;
+  }
+  const verseLink = (s, n, p) => {
+    const q = p && Object.keys(p).length ? "?" + new URLSearchParams(p).toString() : "";
+    return location.origin + (urlMode() === "path" ? baseFolder() + s + ":" + n + q : (new URL(document.baseURI).origin === location.origin ? DOCBASE : location.pathname) + q + "#" + s + ":" + n);
+  };
   const verseText = (s, n) => [arText(s, n), ...trTexts(s, n).slice(0, 1), `— ${meta(s).en} ${s}:${n}`].join("\n");
   const shareEl = document.createElement("div"); shareEl.id = "shareMenu"; shareEl.hidden = true; shareEl.setAttribute("role", "dialog"); shareEl.setAttribute("aria-label", "Share this verse"); document.body.appendChild(shareEl);
   const closeShare = () => { shareEl.hidden = true; };
   async function shareAyah(s, n) {
-    const url = verseLink(s, n), text = verseText(s, n), title = `${meta(s).en} ${s}:${n}`;
-    stat("ayah_action", { action: "share", surah: s, ayah: n, ref: s + ":" + n });
+    const sp = shareParams(), url = verseLink(s, n, sp), title = `${meta(s).en} ${s}:${n}`; let text = verseText(s, n);
+    if (sp.m === "listen") {   // the words of what is being heard: Arabic, translation, or both
+      let tr = ""; if (sp.l !== "ar" && sp.t) { try { await loadTrs([sp.t], s); } catch (e) {} tr = trAt(sp.t, s, n); }
+      text = [...(sp.l !== "tr" ? [arText(s, n)] : []), ...(tr ? [tr] : []), `— ${meta(s).en} ${s}:${n}`].join("\n");
+    }
+    stat("ayah_action", { action: "share", surah: s, ayah: n, ref: s + ":" + n, from: sp.m === "listen" ? "listen" : "page" });
+    if (sp.t && /^(www\.)?globalquran\.com$/i.test(location.hostname)) fetch(`${location.origin}/card/${s}-${n}.jpg?t=${encodeURIComponent(sp.t)}&m=${sp.m}${sp.m === "listen" && sp.r ? "&r=" + encodeURIComponent(sp.r) : ""}&warm=1`).catch(() => {});   // the share card starts drawing now, so the preview is ready when the link is opened
     if (navigator.share) { try { await navigator.share({ title, text, url }); return; } catch (e) { if (e && e.name === "AbortError") return; } }   // cancelled: nothing more to do
     const enc = encodeURIComponent, msg = text + "\n" + url, ic = (d, c) => `<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="${c || "currentColor"}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
     const rows = [
@@ -702,8 +726,22 @@
     lsStage();
     clearTimeout(A.simT); A.sim = 0; A.vi = 0; nowLabel(); $("#plFill").style.width = "0%";
     audio.src = stageUrl(A.st[A.stage], A.s, A.n); audio.playbackRate = A.speed; $("#plPlay").classList.add("loading");
-    audio.play().then(() => $("#plPlay").classList.remove("loading")).catch(simulate);
+    audio.play().then(() => $("#plPlay").classList.remove("loading")).catch(playFail);
   }
+  /* a shared link tries to start the recitation by itself; browsers refuse sound until the page has been touched, so it waits, paused, for the first tap or key (not a silent timed preview) */
+  const tapLabel = on => { const sp = $(".ls-paused span"); if (sp) sp.textContent = on ? "Tap to listen" : "Paused"; };
+  function needTap() { $("#plPlay").classList.remove("loading"); A.paused = true; A.wait = true; setPlayIcon(); tapLabel(true); toast("Tap anywhere to start the recitation"); }
+  /* the browser said "not allowed" (no touch on the page yet): wait for one, then play. Only click and key count, they are the events every browser accepts as a touch;
+     a tap on the stage is used up by this (the stage's own tap would pause it again), and a failed try goes back to waiting, never to the silent timed preview. */
+  const playFail = e => (e && e.name === "NotAllowedError") ? needTap() : simulate();
+  ["click", "keydown"].forEach(ev => document.addEventListener(ev, e => {
+    if (!A.wait || !A.on || !A.paused) return;
+    if (ev === "keydown" && ["Tab", "Shift", "Control", "Alt", "Meta", "Escape"].includes(e.key)) return;
+    const t = e.target && e.target.closest ? e.target : null;
+    if (t && t.closest("#plPlay")) return;   // the play button's own handler starts it
+    if (t && t.closest("#lstage")) { e.stopPropagation(); e.preventDefault(); }
+    A.paused = false; setPlayIcon(); tapLabel(false); audio.play().catch(playFail);
+  }, true));
   function stageDone() { if (A.stage < A.st.length - 1) { A.stage++; startStage(); } else advance(); }
   function simulate() {   // offline / blocked audio: keep the interface working with a timed preview
     $("#plPlay").classList.remove("loading"); A.sim = performance.now(); nowLabel(" · preview (audio unavailable)");
@@ -731,15 +769,15 @@
     if (!A.on || S.s !== to) return;   // stopped, or another surah was opened meanwhile
     playAyah(hasBism(to) ? 0 : 1, to);
   }
-  function stopAudio() { plHide = false; lsEl.classList.remove("plhid"); setTimeout(lsIdle, 0); if (A.on) stat("play_stop", { surah: A.s, ayahs: A.played || 0, secs: Math.round((Date.now() - (A.t0 || Date.now())) / 1000) }); A.on = false; A.paused = false; A.sim = 0; A.q = null; clearTimeout(A.simT); audio.pause(); audio.removeAttribute("src"); showPlayer(false); markPlaying(); setPlayIcon(); $("#plFill").style.width = "0%"; $("#plPlay").classList.remove("loading"); }
+  function stopAudio() { plHide = false; lsEl.classList.remove("plhid"); setTimeout(lsIdle, 0); if (A.on) stat("play_stop", { surah: A.s, ayahs: A.played || 0, secs: Math.round((Date.now() - (A.t0 || Date.now())) / 1000) }); A.on = false; A.paused = false; A.wait = false; A.sim = 0; A.q = null; clearTimeout(A.simT); audio.pause(); audio.removeAttribute("src"); showPlayer(false); markPlaying(); setPlayIcon(); $("#plFill").style.width = "0%"; $("#plPlay").classList.remove("loading"); }
   function togglePlay() {
     if (!A.on) {
       if (S.mode === "saved") return playSaved(0);
       const n = S.sel || S.cur || 1;
       return playAyah(n === 1 && !S.sel && hasBism(S.s) && !bismDone(S.s) ? 0 : n);   // from the top: Bismillah first
     }
-    if (A.paused) { A.paused = false; setPlayIcon(); A.sim ? (A.sim = performance.now(), simulate()) : audio.play().catch(simulate); }
-    else { A.paused = true; audio.pause(); setPlayIcon(); }
+    if (A.paused) { A.paused = false; setPlayIcon(); A.sim ? (A.sim = performance.now(), simulate()) : audio.play().catch(playFail); }
+    else { A.paused = true; A.wait = false; tapLabel(false); audio.pause(); setPlayIcon(); }
   }
   function skip(d) {
     if (!A.on) return S.mode === "saved" ? null : jumpAyah(S.cur + d);
@@ -750,10 +788,10 @@
   audio.addEventListener("error", () => {
     if (!A.on || !audio.getAttribute("src")) return;
     const vs = audioVariants(stageId(A.st[A.stage]));
-    if ((A.vi || 0) + 1 < vs.length) { A.vi = (A.vi || 0) + 1; audio.src = stageUrl(A.st[A.stage], A.s, A.n); audio.play().catch(simulate); } else { stat("audio_error", { reciter: stageId(A.st[A.stage]) }); simulate(); }   // next file variant, else the timed preview
+    if ((A.vi || 0) + 1 < vs.length) { A.vi = (A.vi || 0) + 1; audio.src = stageUrl(A.st[A.stage], A.s, A.n); audio.play().catch(playFail); } else { stat("audio_error", { reciter: stageId(A.st[A.stage]) }); simulate(); }   // next file variant, else the timed preview
   });
   audio.addEventListener("timeupdate", () => { if (A.on && audio.duration) $("#plFill").style.width = (audio.currentTime / audio.duration * 100) + "%"; });
-  audio.addEventListener("playing", () => $("#plPlay").classList.remove("loading"));
+  audio.addEventListener("playing", () => { $("#plPlay").classList.remove("loading"); A.gate = false; A.wait = false; tapLabel(false); });
   $("#plPlay").onclick = togglePlay; $("#btnListen").onclick = togglePlay; $("#plClose").onclick = () => { if (S.view === "listen" && A.on && !plHide) { plHide = true; showPlayer(true); lsEl.classList.add("plhid"); $("#lsVoice").title = "Show player controls"; } else stopAudio(); };   // in Listen view the stage has its own controls: X only tucks the player away
   $("#plEye").onclick = () => setView(S.view === "listen" ? (S.last || "verse") : "listen");   // flips between Listen and the reading view you last chose
   $("#plNext").onclick = () => skip(1); $("#plPrev").onclick = () => skip(-1);
@@ -1176,12 +1214,23 @@
     $("#lsVoiceT").textContent = kind === "ar" ? "Quran · " + arShort() : "Translation · " + trShort();
     lsShow(A.s, A.n, kind === "ar" ? "ar" : "tr"); lsState();
   }
+  /* Listen has nothing to scroll, so the tabs cannot tuck away on scroll: they tuck while the recitation plays (the verse gets the room) and are back when it is paused or stopped.
+     It only reacts when playing starts or stops, so the grip (a tap brings the tabs back) is respected until then. Top tabs only; everywhere else the scroll does it. */
+  function lsTabs(force) {
+    if (!lsVis()) { LS.tabHid = false; return; }
+    const hide = A.on && !A.paused && root.classList.contains("mt-top");
+    if (!force && hide === LS.tabHid) return; LS.tabHid = hide;
+    if (root.classList.contains("mt-tuck") === hide) return;
+    root.classList.toggle("mt-tuck", hide); if (hide && typeof mtClose === "function") mtClose(); setTimeout(() => recalc(), 300);
+  }
   function lsState() {
     const playing = A.on && !A.paused; lsText.setAttribute("aria-live", A.on ? "off" : "polite");   // don't read the verse aloud over the recitation
     lsEl.classList.toggle("playing", playing); lsEl.classList.toggle("paused", A.on && A.paused); lsEl.classList.toggle("idle", !A.on);
     LS.speed = !A.on ? .3 : A.paused ? 0 : 1; if (lsVis()) lsKick();
+    lsTabs();
   }
   function lsAfterOpen(ayah) { if (!lsVis()) return; LS.openAt = Date.now(); LS.key = ""; LS.first = true; A.on ? lsStage() : lsIdle(ayah || 1); }
+  $("#lsShare").onclick = () => shareAyah(LS.s || S.s, Math.max(1, LS.n || S.cur || 1));   // shares what is on the stage, in the voices it is playing
   $("#lsVoice").onclick = e => { if (plHide) { e.stopPropagation(); }  if (plHide) { plHide = false; lsEl.classList.remove("plhid"); $("#lsVoice").title = ""; showPlayer(true); } };
   /* full screen: the stage fills the screen (real full screen where the browser allows it, otherwise it just covers the page); only the verse and the animation stay.
      Touch or mouse movement shows the controls for a moment; Esc leaves. A tap there reveals them instead of pausing. */
@@ -1353,12 +1402,12 @@
   }
   const modesOn = () => !modesEl.hidden;
   function putAwayModes() { store.set("modes", "1"); showModes(false); }
-  async function applyMode(id) {
+  async function applyMode(id, opts = {}) {
     putAwayModes(); showTools(false); store.set("mode", id); stat("mode_select", { mode: id });
     const needTr = ["read_understand", "understand", "listen_both", "listen_tr"].includes(id);
     if (needTr && !S.trs.length) await setTranslations([(S.trList.find(t => t.id === "en.sahih") || S.trList[0] || { id: "en.sahih" }).id]);
     const rec = A.reciter || "ar.alafasy", voices = { listen_ar: [rec, ""], listen_both: [rec, "auto"], listen_tr: ["", "auto"], memorise: [rec, ""] }[id];
-    if (voices) { A.reciter = voices[0]; store.set("reciter", A.reciter); A.trRec = voices[1]; store.set("rtr", A.trRec); }
+    if (voices) { A.reciter = voices[0]; store.set("reciter", A.reciter); A.trRec = voices[1]; if (voices[1] && opts.trRec) A.trRec = opts.trRec; store.set("rtr", A.trRec); }   // a shared link names its translation voice
     A.times = id === "memorise" ? 3 : 1; syncRepeatUi();
     if ((id === "read" || id === "memorise") && !TJ.on && tjOk(FONT)) await setTajweed(true);
     const view = { read: "read", read_understand: "verse", understand: "read" }[id] || "listen", show = id === "understand" ? "tr" : "ar";
@@ -1366,7 +1415,7 @@
     if (!S.trList.some(t => t.id === S.rdTr)) S.rdTr = S.trs[0] || "en.sahih";
     if (readTr()) await loadTr(S.rdTr);
     syncView(); syncTrChip(); syncReciters(); await reRender();
-    if (view === "listen") { if (A.on) replay(); else togglePlay(); }
+    if (view === "listen") { if (opts.from) playAyah(opts.from); else if (A.on) replay(); else togglePlay(); }   // a shared link names the verse to start from
     drawTabs();
     announce(`${(MODES.flatMap(m => m.subs || [m]).find(x => x.id === id) || {}).name} mode`);
   }
@@ -1393,7 +1442,7 @@
     TABSET.forEach(x => root.classList.toggle("mt-" + x, x === v)); mtClose(); $("#optTabs").value = v;
   }
   function drawTabs() {
-    if (!mtNav) return; if (mtMenu && !mtMenu.hidden) mtClose(); root.classList.remove("mt-tuck");   // a view or mode change brings the tabs back
+    if (!mtNav) return; if (mtMenu && !mtMenu.hidden) mtClose(); root.classList.remove("mt-tuck"); lsTabs(true);   // a view or mode change brings the tabs back; in Listen they tuck again while it plays
     const cur = mtCur = S.view === "listen" ? (A.times === 3 ? "memorise" : "listen") : S.view === "read" && S.rd === "tr" ? "understand" : "read";   // what the page is actually showing
     mtNav.innerHTML = MODES.map(m => `<button type="button" class="mtab${m.id === cur ? " on" : ""}" data-m="${m.id}" ${m.subs ? 'aria-haspopup="menu" aria-expanded="false"' : `aria-pressed="${m.id === cur}"`} title="${esc(m.name)}${m.subs ? " (choose)" : ""}"><svg viewBox="0 0 24 24" aria-hidden="true">${MICON[m.id]}</svg><span>${esc(m.name)}</span>${m.subs ? '<svg class="mt-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5"/></svg>' : ""}</button>`).join("");
   }
@@ -1462,6 +1511,11 @@
     if (!trList.some(t => t.id === S.rdTr)) S.rdTr = S.trs[0] || "en.sahih";
     const asked = S.trs.length; S.trs = S.trs.filter(id => trList.some(t => t.id === id)); if (asked && !S.trs.length) S.trs = [(trList.find(t => t.id === "en.sahih") || trList[0] || { id: "en.sahih" }).id];
     if (!S.tlList.some(x => x.id === TL.id)) { const l0 = String(navigator.language || "en").toLowerCase().split("-")[0]; TL.id = (S.tlList.find(x => x.lang === l0) || S.tlList.find(x => x.lang === "en") || S.tlList[0]).id; }
+    const SH = ["listen", "both", "ar", "tr"].includes(qs.get("m")) ? { m: qs.get("m"), l: ["ar", "both", "tr"].includes(qs.get("l")) ? qs.get("l") : "ar", t: qs.get("t") || "", r: qs.get("r") || "", v: qs.get("v") || "" } : null;   // see shareParams()
+    if (SH && !EMBED) { try { const sp = new URLSearchParams(location.search); ["m", "l", "t", "r", "v"].forEach(k => sp.delete(k)); history.replaceState(null, "", location.pathname + (sp.toString() ? "?" + sp : "") + location.hash); } catch (e) {} }   // used once: a reload does not start the recitation again
+    const SHL = SH && SH.m === "listen" && !EMBED ? SH : null;
+    if (SHL && trList.some(x => x.id === SHL.t)) { S.trs = [SHL.t]; S.rdTr = SHL.t; }   // the sharer's translation
+    if (SHL && RECITERS.some(x => x[0] === SHL.r)) A.reciter = SHL.r;   // and the sharer's reciter
     buildTlitSelect(); buildTrList();
     $("#optAr").value = curVar("--fs-ar"); $("#optTrSize").value = curVar("--fs-tr");
     $("#optLayout").value = layoutPref; $("#optFont").value = ["mushaf", "me", "amiri", "kfc"].includes(fontPref) ? fontPref : "mushaf";
@@ -1477,11 +1531,12 @@
     if (!s && store.get("pos")) { const p = store.get("pos").split(":"); s = +p[0]; a = +p[1] || 1; }
     s = clamp(s || 1, 1, 114); a = clamp(a, 1, meta(s).c);
     syncView(); syncTrChip(); syncReciters();
-    openSurah(s, a, { flash: false, via: "start" });
+    const opening = openSurah(s, a, { flash: false, via: "start" });
     if (!EMBED && !route.s && !route.page && !route.eds.length && route.search == null && !store.get("pos") && !store.get("modes")) showModes(true);   // very first visit, landing page
     if (window.GQA) GQA.start({ mode: store.get("mode") || "default", entry: route.search != null ? "search_link" : route.page ? "page_link" : route.eds.length ? "edition_link" : route.s ? "link" : store.get("pos") ? "resume" : "new", view: S.view, show: S.view === "read" ? S.rd : "both", font: FONT, theme: S.theme, tajweed: TJ.on ? "on" : "off", translit: TL.on ? TL.id : "off", translations: S.trs.length, tr_lang: (S.trs[0] || "none").split(".")[0], device: innerWidth < 720 ? "phone" : innerWidth < 1100 ? "tablet" : "desktop" });
     if (EMBED) parent.postMessage({ source: "globalquran", type: "ready" }, "*");
     if (document.fonts) document.fonts.ready.then(() => recalc());
+    if (SHL && route.s) { await opening; A.gate = true; await applyMode({ ar: "listen_ar", both: "listen_both", tr: "listen_tr" }[SHL.l], { from: a, trRec: TR_REC.some(x => x[0] === SHL.v) ? SHL.v : "" }); }   // the same Listen stage, the recitation starting at the shared verse
   }
   /* the address changed in place (a typed #2:255, a link on this page, the back / forward buttons): open that place. The reader writes places with replaceState, which fires nothing, so only outside changes arrive here. */
   async function onAddress() {
