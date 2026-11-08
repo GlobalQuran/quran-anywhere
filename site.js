@@ -68,14 +68,19 @@
     try { const r = await fetch("https://api.github.com/repos/" + L.repo); if (!r.ok) return; const d = await r.json(); const s = { stars: d.stargazers_count, forks: d.forks_count, t: Date.now() };
       setStats(s); try { localStorage.setItem("gq2.gh", JSON.stringify(s)); } catch (e) {} } catch (e) {}
   }
+  /* line the panel up with its button's right edge, but never let it run off the left of a narrow screen (on a phone the button is far from the right edge and the panel is almost as wide as the screen) */
+  function place(panel, button) {
+    const r = button.getBoundingClientRect(), w = panel.offsetWidth || 0;
+    panel.style.right = Math.min(Math.max(8, innerWidth - r.right), Math.max(8, innerWidth - w - 8)) + "px";
+  }
   function toggle(open) {
     const v = open ?? pop.hidden; pop.hidden = !v; btn.setAttribute("aria-expanded", v);
-    if (v) { const r = btn.getBoundingClientRect(); pop.style.right = Math.max(8, innerWidth - r.right) + "px"; stats(); }
+    if (v) { place(pop, btn); stats(); }
   }
   const vbtn = $id("sbVer");
   function toggleVer(open) {
     const v = open ?? vpop.hidden; vpop.hidden = !v; vbtn.setAttribute("aria-expanded", v);
-    if (v) { toggle(false); const r = vbtn.getBoundingClientRect(); vpop.style.right = Math.max(8, innerWidth - r.right) + "px"; }
+    if (v) { toggle(false); place(vpop, vbtn); }
   }
   btn.onclick = () => { toggle(); if (!pop.hidden) toggleVer(false); };
   vbtn.onclick = () => toggleVer();

@@ -822,3 +822,12 @@ html.mt-top.mt-tuck .mt-grip { display: block; position: absolute; z-index: 5; l
 @media (max-width: 719px) { .plp, .plp-opts { flex-wrap: nowrap; } .pl-text { flex: 1 1 0; } }
 @media (min-width: 480px) and (max-width: 719px) { .plp-opts { flex: 0 1 auto; min-width: 0; } .pl-text { min-width: 40px; } .vpill { flex: 0 1 auto; min-width: 44px; } }   /* a long voice name shortens with an ellipsis instead of pushing the buttons off the edge */
 @media (max-width: 359px) { .plp, .plp-opts { gap: 4px; } #plEye { display: none; } }   /* very narrow phones: the page is only ~220px wide, so the least-used button goes */
+
+/* the Listen stage's Share button sits beside the focus-view button; in full screen the other controls fade away, this one stays as a faint mark and comes up with them */
+.ls-ctl { gap: 8px; }
+.ls-share svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+html.ls-full .ls-ctl, html.ls-full .lstage.reveal .ls-ctl { opacity: 1; pointer-events: none; }
+html.ls-full .ls-ctl .ls-fs { opacity: 0; pointer-events: none; transition: opacity .5s ease; }
+html.ls-full .lstage.reveal .ls-ctl .ls-fs { opacity: 1; pointer-events: auto; }
+html.ls-full .ls-ctl .ls-share { opacity: .78; pointer-events: auto; transition: opacity .5s ease; }
+html.ls-full .lstage.reveal .ls-ctl .ls-share, html.ls-full .ls-ctl .ls-share:hover, html.ls-full .ls-ctl .ls-share:focus-visible { opacity: 1; }
