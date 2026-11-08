@@ -292,7 +292,7 @@
     const m = meta(n), ay = Array.from({ length: m.c }, (_, i) => arText(n, i + 1));
     S.s = n; S.count = m.c; S.sel = 0;
     const bism = (n !== 1 && n !== 9) ? `<div class="bism${qcfOn(1) ? " qcf" : ""}" lang="ar">${bismHtml()}</div>` : "";
-    inner.innerHTML = `<div class="surah-head">
+    inner.innerHTML = `<div class="surah-head"><div class="s-cal" aria-hidden="true"><i></i><span class="sn">${pad3(n)}</span><i></i></div>
       <p class="s-info"><b>${esc(m.en)}</b> · ${esc(m.me)} · ${m.t === "M" ? "Meccan" : "Medinan"} · ${m.c} verses · Juz ${m.j}</p></div>${bism}`
       + ay.map((t, i) => ayahHtml(n, i + 1, t)).join(S.view === "read" ? " " : "")
       + `<div class="end">${n < 114 ? `<button data-act="nextSurah">Next: ${esc(meta(n + 1).en)} ›</button>` : "End of the Qur'an"}</div>`;
@@ -1128,7 +1128,7 @@
      big Play. Paused: everything freezes and dims with a "Paused" mark. The page itself (mushaf glyphs / chosen font, tajweed colours, translation) is the same as elsewhere.
      Behind the text a canvas draws a slow rotating geometric rosette and drifting light motes; it runs while playing, drifts gently when idle, stops when paused. */
   const lsEl = $("#lstage"), lsText = $("#lsText"), lsBody = $("#lsBody"), lsCv = $("#lsCanvas");
-  const LS = { openAt: 0, tok: 0, key: "", raf: 0, last: 0, phase: 0, speed: .3, motes: null, still: matchMedia("(prefers-reduced-motion: reduce)").matches };
+  const LS = { openAt: 0, tok: 0, key: "", raf: 0, last: 0, phase: 0, speed: .3, amp: 0, motes: null, still: matchMedia("(prefers-reduced-motion: reduce)").matches };
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   const lsVis = () => S.view === "listen" && S.mode !== "saved" && !!S.data;
   function lsVisibility() { lsEl.hidden = !lsVis(); if (lsVis()) { lsSize(); lsKick(); } else { cancelAnimationFrame(LS.raf); LS.raf = 0; } }
@@ -1161,6 +1161,7 @@
     const both = show === "both" && ar && tr;
     lsText.className = "ls-text out " + (both ? "show-both" : "show-" + show);
     lsText.innerHTML = (ar ? `<div class="ls-ar${ar.cls ? " " + ar.cls : ""}" lang="ar">${ar.html}</div>` : "") + (!ar || tr ? tr : "");
+    $$(".ls-ar .w, .ls-ar .qe", lsText).forEach((el, i) => el.style.setProperty("--i", Math.min(i, 40)));   // the words appear one after another (CSS)
     lsFit(); requestAnimationFrame(() => requestAnimationFrame(() => lsText.classList.remove("out")));
   }
   function lsIdle(n) {
@@ -1213,37 +1214,87 @@
     togglePlay(); if (root.classList.contains("ls-full")) lsReveal();
   });
 
-  /* the canvas: a floral medallion (like the gilded shamsa of old manuscripts): rings of pointed-arch petals turning slowly in opposite directions, soft circles, a breathing glow and drifting light motes */
+  /* the canvas: an illuminated stage. A deep halo, slow light rays, interlaced girih star rings turning against each other, a ring of small khatams, the surah's
+     calligraphic name as a faint watermark, drifting motes, and all of it breathing with the recitation itself: an AnalyserNode on the <audio> (the CDN answers with
+     Access-Control-Allow-Origin: *, and the element is crossorigin="anonymous", so the samples are readable). Without an analyser the stage breathes on a timer.
+     LS.amp (0..1) is also written to --amp on #lstage, so the play button's ring, the equalizer and the text glow follow the voice in CSS. */
+  let AN = null;   // { ctx, an, buf } once created; false when the browser cannot
+  function anInit() {
+    if (AN !== null) return AN;
+    try { const C = window.AudioContext || window.webkitAudioContext; if (!C || !audio.crossOrigin) return (AN = false);
+      const ctx = new C(), src = ctx.createMediaElementSource(audio), an = ctx.createAnalyser(); an.fftSize = 512; an.smoothingTimeConstant = .72;
+      src.connect(an); an.connect(ctx.destination); AN = { ctx, an, buf: new Uint8Array(an.fftSize) };
+    } catch (e) { AN = false; }
+    return AN;
+  }
+  audio.addEventListener("play", () => { if (lsVis() || AN) anInit(); if (AN && AN.ctx.state !== "running") AN.ctx.resume().catch(() => {}); });
+  function anLevel() {   // 0..1 loudness of what is playing right now, or -1 when nothing can be measured
+    if (!AN || !A.on || A.paused || A.sim || AN.ctx.state !== "running") return -1;
+    AN.an.getByteTimeDomainData(AN.buf); let sum = 0; for (let i = 0; i < AN.buf.length; i += 2) { const v = (AN.buf[i] - 128) / 128; sum += v * v; }
+    return Math.min(1, Math.sqrt(sum / (AN.buf.length / 2)) * 3.4);
+  }
   function lsSize() {
     const dpr = Math.min(2, devicePixelRatio || 1), w = lsEl.clientWidth, h = lsEl.clientHeight; if (!w || !h) return;
     lsCv.width = Math.round(w * dpr); lsCv.height = Math.round(h * dpr);
-    LS.motes = Array.from({ length: Math.round(w * h / 14000) + 14 }, () => ({ x: Math.random(), y: Math.random(), r: .6 + Math.random() * 1.6, v: .00002 + Math.random() * .00004, p: Math.random() * 6.28 }));
+    LS.motes = Array.from({ length: Math.round(w * h / 12000) + 16 }, () => ({ x: Math.random(), y: Math.random(), r: .5 + Math.random() * 1.7, v: .00002 + Math.random() * .00005, p: Math.random() * 6.28, tw: Math.random() < .25 }));
     lsDraw(0);
   }
-  function lsPetals(g, cx, cy, r0, r1, n, rot) {   // n pointed-arch petals between radii r0 and r1
-    const P = (r, a) => [cx + Math.cos(a) * r, cy + Math.sin(a) * r], half = Math.PI / n * .86, d = r1 - r0;
-    for (let i = 0; i < n; i++) {
-      const a = rot + i * 2 * Math.PI / n, s = P(r0, a); g.beginPath(); g.moveTo(...s);
-      g.bezierCurveTo(...P(r0 + d * .3, a - half * 1.05), ...P(r0 + d * .72, a - half * .55), ...P(r1, a));
-      g.bezierCurveTo(...P(r0 + d * .72, a + half * .55), ...P(r0 + d * .3, a + half * 1.05), ...s); g.stroke();
-    }
+  const P2 = Math.PI * 2;
+  function lsStar(g, cx, cy, r, n, step, rot) {   // the {n/step} star polygon: every vertex joined to the one `step` further round
+    g.beginPath();
+    for (let i = 0; i < n; i++) { const a = rot + i * P2 / n, b = rot + ((i + step) % n) * P2 / n; g.moveTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r); g.lineTo(cx + Math.cos(b) * r, cy + Math.sin(b) * r); }
+    g.stroke();
+  }
+  function lsKhatam(g, cx, cy, r, rot) {   // a small eight-pointed star: two squares
+    g.beginPath(); for (let k = 0; k < 2; k++) for (let i = 0; i <= 4; i++) { const a = rot + k * Math.PI / 4 + i * Math.PI / 2, x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r; i ? g.lineTo(x, y) : g.moveTo(x, y); } g.stroke();
   }
   function lsDraw(dt) {
     const g = lsCv.getContext("2d"), w = lsCv.width, h = lsCv.height; if (!w) return;
-    const night = root.classList.contains("night"), col = night ? "213,183,91" : "150,122,40", ph = LS.phase, cx = w / 2, cy = h / 2, R = Math.min(w, h) * .5, u = Math.max(1, w / 800);
+    const night = root.classList.contains("night"), col = night ? "222,190,96" : "150,122,40", ph = LS.phase, cx = w / 2, cy = h / 2, R = Math.min(w, h) * .5, u = Math.max(1, w / 800), amp = LS.amp;
     g.clearRect(0, 0, w, h);
-    const br = .5 + .5 * Math.sin(ph * .0014), gr = g.createRadialGradient(cx, cy, 0, cx, cy, R * 1.15);
-    gr.addColorStop(0, `rgba(${col},${(night ? .17 : .13) + br * .07})`); gr.addColorStop(.6, `rgba(${col},${night ? .05 : .04})`); gr.addColorStop(1, `rgba(${col},0)`); g.fillStyle = gr; g.fillRect(0, 0, w, h);
-    g.lineWidth = 1.1 * u; g.lineJoin = "round";
-    const L = [[.12, .34, 12, -1], [.28, .52, 16, 1], [.44, .70, 20, -1], [.62, .88, 28, 1]];
-    L.forEach(([a0, a1, n, dir], k) => { g.strokeStyle = `rgba(${col},${((night ? .24 : .2) - k * .035).toFixed(3)})`; lsPetals(g, cx, cy, R * a0, R * a1, n, ph * .00006 * dir * (1 + k * .15) + k * .2); });
-    for (let k = 0; k < 3; k++) { g.beginPath(); g.setLineDash(k === 1 ? [3 * u, 11 * u] : []); g.strokeStyle = `rgba(${col},${night ? .11 : .09})`; g.arc(cx, cy, R * (.24 + .3 * k) * (1 + .012 * Math.sin(ph * .001 + k)), 0, 6.283); g.stroke(); } g.setLineDash([]);
-    if (LS.motes) for (const m of LS.motes) { m.y -= m.v * dt; if (m.y < -.02) { m.y = 1.02; m.x = Math.random(); } const a = (.25 + .55 * (.5 + .5 * Math.sin(ph * .002 + m.p))) * (night ? .85 : .6); g.fillStyle = `rgba(${col},${a.toFixed(3)})`; g.beginPath(); g.arc(m.x * w, m.y * h, m.r * u, 0, 6.283); g.fill(); }
+    /* the halo: breathes slowly, swells with the voice */
+    const br = .5 + .5 * Math.sin(ph * .0012), hal = (night ? .17 : .13) + br * .05 + amp * .3;
+    const gr = g.createRadialGradient(cx, cy, 0, cx, cy, R * (1.05 + amp * .25));
+    gr.addColorStop(0, `rgba(${col},${hal.toFixed(3)})`); gr.addColorStop(.45, `rgba(${col},${((night ? .06 : .045) + amp * .05).toFixed(3)})`); gr.addColorStop(1, `rgba(${col},0)`);
+    g.fillStyle = gr; g.fillRect(0, 0, w, h);
+    /* light rays, turning very slowly */
+    g.save(); g.translate(cx, cy); g.rotate(ph * .000012);
+    for (let i = 0; i < 28; i++) {
+      const a = i * P2 / 28, wd = .018 + .012 * Math.sin(ph * .0007 + i), al = (night ? .05 : .035) + amp * .06 * (.5 + .5 * Math.sin(ph * .003 + i * 1.7));
+      const rg = g.createLinearGradient(0, 0, Math.cos(a) * R * 1.6, Math.sin(a) * R * 1.6); rg.addColorStop(0, `rgba(${col},${al.toFixed(3)})`); rg.addColorStop(1, `rgba(${col},0)`);
+      g.fillStyle = rg; g.beginPath(); g.moveTo(0, 0); g.arc(0, 0, R * 1.6, a - wd, a + wd); g.closePath(); g.fill();
+    }
+    g.restore();
+    /* the surah's name in calligraphy, as a watermark behind everything */
+    if (LS.s && document.fonts && document.fonts.check("20px SurahNames")) { g.save(); g.font = `${Math.round(R * .8)}px SurahNames`; g.textAlign = "center"; g.textBaseline = "middle"; g.fillStyle = `rgba(${col},${((night ? .075 : .06) + amp * .04).toFixed(3)})`; g.fillText(pad3(LS.s), cx, cy); g.restore(); }
+    /* girih rings: interlaced star polygons turning against each other */
+    g.lineJoin = "round"; g.lineCap = "round";
+    const rings = [[.2, 8, 3, -1], [.34, 16, 6, 1], [.5, 16, 5, -1], [.68, 24, 9, 1], [.88, 32, 13, -1]];
+    rings.forEach(([f, n, st, dir], k) => {
+      const r = R * f * (1 + .02 * Math.sin(ph * .0009 + k) + amp * .03), al = ((night ? .26 : .22) - k * .035) * (.75 + amp * .5);
+      g.lineWidth = (k === 1 || k === 3 ? 1.3 : .9) * u; g.strokeStyle = `rgba(${col},${al.toFixed(3)})`;
+      lsStar(g, cx, cy, r, n, st, ph * .00005 * dir * (1 + k * .12) + k * .3);
+      g.lineWidth = .7 * u; g.strokeStyle = `rgba(${col},${(al * .5).toFixed(3)})`; g.beginPath(); g.arc(cx, cy, r, 0, P2); g.stroke();
+    });
+    /* a ring of small khatams orbiting between the middle rings */
+    for (let i = 0; i < 12; i++) {
+      const a = ph * .00004 + i * P2 / 12, r = R * .59, x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r;
+      g.lineWidth = .9 * u; g.strokeStyle = `rgba(${col},${Math.min(1, (night ? .3 : .24) * (.6 + .4 * Math.sin(ph * .002 + i)) + amp * .2).toFixed(3)})`; lsKhatam(g, x, y, R * .035, -a * 2);
+    }
+    /* motes drifting up, a few of them twinkling */
+    if (LS.motes) for (const m of LS.motes) {
+      m.y -= m.v * dt; if (m.y < -.02) { m.y = 1.02; m.x = Math.random(); }
+      const tw = m.tw ? Math.max(0, Math.sin(ph * .004 + m.p)) ** 6 : 0, a = (.22 + .5 * (.5 + .5 * Math.sin(ph * .002 + m.p))) * (night ? .9 : .6) + tw * .6 + amp * .2;
+      g.fillStyle = `rgba(${col},${Math.min(1, a).toFixed(3)})`; g.beginPath(); g.arc(m.x * w, m.y * h, m.r * u * (1 + tw * 1.5), 0, P2); g.fill();
+    }
   }
   function lsLoop(now) {
     LS.raf = 0; if (!lsVis() || document.hidden) return;
-    const dt = Math.min(64, now - (LS.last || now)); LS.last = now; const sp = LS.still ? 0 : LS.speed; LS.phase += dt * sp; lsDraw(dt * sp);
-    if (sp > 0) LS.raf = requestAnimationFrame(lsLoop);
+    const dt = Math.min(64, now - (LS.last || now)); LS.last = now; const sp = LS.still ? 0 : LS.speed; LS.phase += dt * sp;
+    const lv = anLevel(), target = lv >= 0 ? lv : (A.on && !A.paused ? .18 + .14 * Math.sin(LS.phase * .003) : 0);
+    LS.amp += (target - LS.amp) * (target > LS.amp ? .35 : .08); if (LS.amp < .002) LS.amp = 0;
+    lsEl.style.setProperty("--amp", LS.amp.toFixed(3)); lsDraw(dt * sp);
+    if (sp > 0 || LS.amp > 0) LS.raf = requestAnimationFrame(lsLoop);
   }
   function lsKick() { if (!LS.raf) { LS.last = 0; LS.raf = requestAnimationFrame(lsLoop); } }
   new ResizeObserver(() => { if (lsVis()) { lsSize(); lsFit(); } }).observe(lsEl);

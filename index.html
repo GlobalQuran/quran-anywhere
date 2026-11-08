@@ -26,7 +26,7 @@ window.gq = window.gq || { _quran: [], setConfig: function (c) { window.GQ_LEGAC
 <meta name="theme-color" content="#1a2224">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Global Quran">
-<link rel="stylesheet" href="app.css?v=72">
+<link rel="stylesheet" href="app.css?v=73">
 </head>
 <body>
 <a class="skip" id="skip" href="#">Skip to the Quran text</a>
@@ -128,6 +128,7 @@ window.gq = window.gq || { _quran: [], setConfig: function (c) { window.GQ_LEGAC
         <div class="modes" id="modes" role="region" aria-labelledby="modesT" hidden>
           <i class="modes-tape" aria-hidden="true"></i>
           <button type="button" class="icon-btn modes-x" id="modesX" aria-label="Close"><svg><use href="img/sprite.svg#i-close"/></svg></button>
+          <div class="modes-bism" lang="ar" aria-hidden="true">بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ</div>
           <h2 class="modes-h" id="modesT">How would you like to read today?</h2>
           <p class="modes-note">Each mode sets the page up differently: which view you see, whether the translation shows, and whether audio plays. You can change any of it afterwards in the options.</p>
           <div class="modes-chips" id="modesChips"></div>
@@ -272,10 +273,10 @@ window.gq = window.gq || { _quran: [], setConfig: function (c) { window.GQ_LEGAC
   <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 </div>
 
-<audio id="audio" preload="none"></audio>
+<audio id="audio" preload="none" crossorigin="anonymous"></audio>
 <script src="gq-api.js?v=3"></script>
 <script src="analytics.js?v=2"></script>
-<script src="app.js?v=73"></script>
+<script src="app.js?v=74"></script>
 <script src="site.js?v=10"></script>
 </body>
 </html>
