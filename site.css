@@ -2,7 +2,7 @@
 :root { --sb: 36px; }
 html.site-on body { display: flex; flex-direction: column; }
 html.site-on .app { height: auto; flex: 1 1 0; min-height: 0; }
-.sitebar { flex: none; height: var(--sb); display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 14px; background: #1a2224; color: #cdd8d6; font: 13px/1 Arial, Helvetica, sans-serif; border-bottom: 1px solid rgba(255,255,255,.08); position: relative; z-index: 70; }
+.sitebar { flex: none; height: var(--sb); display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 14px; background: #1a2224; color: #cdd8d6; font: 13px/1 var(--ui); border-bottom: 1px solid rgba(255,255,255,.08); position: relative; z-index: 70; }
 .sb-l, .sb-r { display: flex; align-items: center; gap: 4px; min-width: 0; }
 .sitebar a, .sitebar button { display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 11px; border: 0; border-radius: 13px; background: none; color: inherit; font: inherit; text-decoration: none; cursor: pointer; white-space: nowrap; }
 .sitebar a:hover, .sitebar button:hover, .sitebar button[aria-expanded="true"] { background: rgba(255,255,255,.1); color: #fff; }
@@ -10,10 +10,10 @@ html.site-on .app { height: auto; flex: 1 1 0; min-height: 0; }
 .sitebar button { background: rgba(213,183,91,.16); color: #f0d98a; font-weight: 700; } .sitebar button i { font-style: normal; font-size: 9px; }
 .sitebar button:hover, .sitebar button[aria-expanded="true"] { background: rgba(213,183,91,.3); color: #f6e3a0; }
 
-.devpop { position: fixed; z-index: 120; top: calc(var(--sb) + 6px); width: min(380px, calc(100vw - 16px)); max-height: calc(100vh - var(--sb) - 16px); overflow-y: auto; padding: 14px 16px 16px; background: #fbfaf6; color: #2b3434; border: 1px solid #a58a3a; outline: 3px double rgba(165,138,58,.35); outline-offset: -7px; border-radius: 4px; box-shadow: 0 10px 30px rgba(0,0,0,.4); font: 14px/1.4 Arial, Helvetica, sans-serif; }
+.devpop { position: fixed; z-index: 120; top: calc(var(--sb) + 6px); width: min(380px, calc(100vw - 16px)); max-height: calc(100vh - var(--sb) - 16px); overflow-y: auto; padding: 14px 16px 16px; background: #fbfaf6; color: #2b3434; border: 1px solid #a58a3a; outline: 3px double rgba(165,138,58,.35); outline-offset: -7px; border-radius: 4px; box-shadow: 0 10px 30px rgba(0,0,0,.4); font: 14px/1.4 var(--ui); }
 .devpop[hidden] { display: none; }
-.dv-h { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 10px; font: 700 13px/1 Fontin, Georgia, serif; letter-spacing: .1em; text-transform: uppercase; color: #8a7027; }
-.dv-h span { font: italic 12px/1 Georgia, serif; letter-spacing: 0; text-transform: none; color: #6f7b79; }
+.dv-h { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 10px; font: 700 13px/1 var(--brand); letter-spacing: .1em; text-transform: uppercase; color: #8a7027; }
+.dv-h span { font: italic 12px/1 var(--serif); letter-spacing: 0; text-transform: none; color: #6f7b79; }
 .dv-card { position: relative; display: block; margin: 0 0 8px; padding: 10px 34px 10px 12px; border: 1px solid #d8d4c4; border-radius: 8px; background: #fff; color: inherit; text-decoration: none; }
 .dv-card:hover { border-color: #a58a3a; background: #fffaf0; }
 .dv-card b { display: block; font-size: 15px; } .dv-card small { display: block; margin-top: 2px; font-size: 12.5px; color: #6f7b79; }
@@ -22,7 +22,7 @@ html.site-on .app { height: auto; flex: 1 1 0; min-height: 0; }
 .dv-embed { margin-top: 12px; } .dv-embed b { display: block; margin-bottom: 6px; font-size: 13px; }
 .dv-embed textarea { width: 100%; resize: none; padding: 8px 10px; border: 1px solid #d4d2c8; border-radius: 6px; background: #f4f2ea; color: #2b3434; font: 12px/1.45 ui-monospace, Menlo, Consolas, monospace; }
 .dv-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; }
-.dv-row button { height: 32px; padding: 0 14px; border: 0; border-radius: 16px; background: linear-gradient(#f4dd8f, #c9a944); color: #2a2208; font: 700 13px Arial; cursor: pointer; }
+.dv-row button { height: 32px; padding: 0 14px; border: 0; border-radius: 16px; background: linear-gradient(#f4dd8f, #c9a944); color: #2a2208; font: 700 13px var(--ui); cursor: pointer; }
 .dv-row a { font-size: 13px; color: #8a7027; }
 
 /* footer links inside the sidebar footer */
@@ -41,9 +41,9 @@ html.site-on .app { height: auto; flex: 1 1 0; min-height: 0; }
 /* version menu */
 .sitebar .sb-ver { background: rgba(255,255,255,.09); color: #e6eeec; font-weight: 700; } .sitebar .sb-ver i { font-style: normal; font-size: 9px; }
 .sitebar .sb-ver:hover, .sitebar .sb-ver[aria-expanded="true"] { background: rgba(255,255,255,.18); color: #fff; }
-.verpop { position: fixed; z-index: 120; top: calc(var(--sb) + 6px); min-width: 210px; padding: 10px 10px 8px; background: #fbfaf6; color: #2b3434; border: 1px solid #a58a3a; outline: 3px double rgba(165,138,58,.35); outline-offset: -6px; border-radius: 4px; box-shadow: 0 10px 30px rgba(0,0,0,.4); font: 14px/1.3 Arial, Helvetica, sans-serif; }
+.verpop { position: fixed; z-index: 120; top: calc(var(--sb) + 6px); min-width: 210px; padding: 10px 10px 8px; background: #fbfaf6; color: #2b3434; border: 1px solid #a58a3a; outline: 3px double rgba(165,138,58,.35); outline-offset: -6px; border-radius: 4px; box-shadow: 0 10px 30px rgba(0,0,0,.4); font: 14px/1.3 var(--ui); }
 .verpop[hidden] { display: none; }
-.vp-h { margin: 2px 6px 8px; font: 700 12px/1 Fontin, Georgia, serif; letter-spacing: .1em; text-transform: uppercase; color: #8a7027; }
+.vp-h { margin: 2px 6px 8px; font: 700 12px/1 var(--brand); letter-spacing: .1em; text-transform: uppercase; color: #8a7027; }
 .verpop a, .vp-cur { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 9px 10px; border-radius: 8px; color: inherit; text-decoration: none; font-weight: 700; }
 .verpop a:hover { background: rgba(165,138,58,.16); } .verpop a i { font-style: normal; color: #a58a3a; }
-.vp-cur { background: rgba(165,138,58,.2); } .vp-cur em { font: italic 12px Georgia, serif; font-weight: 400; color: #6f7b79; }
+.vp-cur { background: rgba(165,138,58,.2); } .vp-cur em { font: italic 12px var(--serif); font-weight: 400; color: #6f7b79; }

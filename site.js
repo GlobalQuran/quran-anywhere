@@ -29,7 +29,7 @@
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const root = document.documentElement;
   root.classList.add("site-on");
-  const css = document.createElement("link"); css.rel = "stylesheet"; css.href = "site.css?v=4"; document.head.appendChild(css);
+  const css = document.createElement("link"); css.rel = "stylesheet"; css.href = "site.css?v=5"; document.head.appendChild(css);
 
   /* ---------- top nav ---------- */
   const bar = document.createElement("nav");
