@@ -837,3 +837,8 @@ html.ls-full .lstage.reveal .ls-ctl .ls-share, html.ls-full .ls-ctl .ls-share:ho
 .lstage, .lstage .ls-text, .lstage .ls-text * , .lstage .ls-paused { cursor: pointer; }
 .lstage .ls-text .num { cursor: pointer; }
 html.ls-full .lstage:not(.reveal), html.ls-full .lstage:not(.reveal) * { cursor: none; }
+
+/* the background chooser sits with the other stage buttons; in full screen it hides with the focus button and comes up with it */
+.ls-bg svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+html.ls-full .ls-ctl .ls-bg { opacity: 0; pointer-events: none; transition: opacity .5s ease; }
+html.ls-full .lstage.reveal .ls-ctl .ls-bg { opacity: 1; pointer-events: auto; }
