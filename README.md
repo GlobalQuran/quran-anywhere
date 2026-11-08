@@ -131,11 +131,12 @@ Set these in a `<script>` **before** `app.js` (or pass them as `?query` paramete
 | `window.GQ_URLS = "hash" \| "path" \| "off"` | How the place is written in the address bar. `hash` (`#2:255`) works on any host and is the default. `path` (`/2:255`) needs the host to serve `index.html` for every path (see below). `off` leaves the address alone. Also `?urls=` or `<meta name="gq-urls" content="path">`. |
 | `window.GQ_BASE = "/quran/"` | Folder the app lives in, for path links. Worked out automatically if not set. |
 | `window.GQ_TRANSLATIONS = "en.sahih,ur.jalandhry"` | Default translations for a visitor's **first** visit (their own choice wins afterwards). |
+| `window.GQ_TABS = "top" \| "side" \| "none"` | Where the mode tabs (Read, Understand, Listen, Memorise) sit on the book. `top` is the default; `none` hides them and shows a Mode menu in the options bar instead. A visitor's own choice (Settings > Mode tabs) wins afterwards, and `?tabs=` overrides both. |
 | `window.GQ_API_KEY = "…"` | Your API key, if you have one (`?key=`). |
 | `window.GQ_API_URL = "…"` | Use another API base (`?api=`). |
 | `window.GQ_ASSETS = "…"` | Where mushaf glyph data and page fonts load from (default: the Global Quran CDN). |
 
-Other query parameters: `?theme=night`, `?tr=en.sahih`, `?font=amiri`, `?player=0`, `?sidebar=1`. Embeds and `?embed=1` never touch the address bar.
+Other query parameters: `?theme=night`, `?tr=en.sahih`, `?font=amiri`, `?tabs=top|side|none`, `?player=0`, `?sidebar=1`. Embeds and `?embed=1` never touch the address bar.
 
 <details>
 <summary><strong>Clean <code>/2:255</code> links (optional)</strong></summary>
