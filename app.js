@@ -839,9 +839,9 @@
   const syncMenuBtn = () => $("#btnMenu").setAttribute("aria-expanded", menuOpen());
   function toggleMenu() {
     if (drawerMode()) menuOpen() ? closeMenu() : openMenu();
-    else { app.classList.toggle("side-off"); store.set("sideOff", app.classList.contains("side-off") ? "1" : "0"); syncMenuBtn(); }
+    else { app.classList.toggle("side-off"); syncMenuBtn(); }   // opening it is not remembered: the next visit starts closed again
   }
-  if (store.get("sideOff") !== "0" && !(EMBED && root.classList.contains("embed-side"))) app.classList.add("side-off");   // closed unless the visitor opened it
+  if (!(EMBED && root.classList.contains("embed-side"))) app.classList.add("side-off");   // closed on every load; only the menu button opens it
   wideMq.addEventListener && wideMq.addEventListener("change", () => { app.classList.remove("menu-open"); syncMenuBtn(); });
   function openMenu() { app.classList.add("menu-open"); syncMenuBtn(); const cur = $("#surahList button.cur"); cur && cur.scrollIntoView({ block: "center" }); }
   function closeMenu() { app.classList.remove("menu-open"); syncMenuBtn(); }
@@ -869,6 +869,7 @@
     root.classList.toggle("listen-on", S.view === "listen"); if (S.view !== "listen" && plHide) { plHide = false; lsEl.classList.remove("plhid"); if (A.on) showPlayer(true); } lsVisibility();
     $("#plEye").setAttribute("aria-pressed", S.view === "listen"); root.classList.toggle("read-on", S.view === "read"); root.classList.toggle("rd-tr", readTr());
     $$("#segView button").forEach(b => b.setAttribute("aria-pressed", b.dataset.v === S.view)); $$("#segRd button").forEach(b => b.setAttribute("aria-pressed", b.dataset.v === S.rd));
+    drawTabs();
   }
   const reRender = () => openSurah(S.s, S.cur || 1, { flash: false, keepAudio: true });
   async function setView(v) { stat("setting_change", { setting: "view", value: v }); S.view = v; store.set("view", v); if (v !== "listen") { S.last = v; store.set("lastview", v); } if (readTr()) await loadTr(S.rdTr); syncView(); syncTrChip(); syncReciters(); reRender(); }
@@ -1178,12 +1179,9 @@
   function lsState() {
     const playing = A.on && !A.paused; lsText.setAttribute("aria-live", A.on ? "off" : "polite");   // don't read the verse aloud over the recitation
     lsEl.classList.toggle("playing", playing); lsEl.classList.toggle("paused", A.on && A.paused); lsEl.classList.toggle("idle", !A.on);
-    $("#lsPlay use").setAttribute("href", "img/sprite.svg#" + (playing ? "i-pause" : "i-play")); $("#lsPlay").setAttribute("aria-label", playing ? "Pause" : "Play");
     LS.speed = !A.on ? .3 : A.paused ? 0 : 1; if (lsVis()) lsKick();
   }
   function lsAfterOpen(ayah) { if (!lsVis()) return; LS.openAt = Date.now(); LS.key = ""; LS.first = true; A.on ? lsStage() : lsIdle(ayah || 1); }
-  function lsGo(d) { if (A.on) return skip(d); const n = clamp((LS.s === S.s && LS.n ? LS.n : S.cur || 1) + d, 1, S.count); jumpAyah(n, { smooth: false, flash: false }); setCur(n); lsIdle(n); }
-  $("#lsPlay").onclick = () => togglePlay(); $("#lsPrev").onclick = () => lsGo(-1); $("#lsNext").onclick = () => lsGo(1);
   $("#lsVoice").onclick = e => { if (plHide) { e.stopPropagation(); }  if (plHide) { plHide = false; lsEl.classList.remove("plhid"); $("#lsVoice").title = ""; showPlayer(true); } };
   /* full screen: the stage fills the screen (real full screen where the browser allows it, otherwise it just covers the page); only the verse and the animation stay.
      Touch or mouse movement shows the controls for a moment; Esc leaves. A tap there reveals them instead of pausing. */
@@ -1227,7 +1225,7 @@
     } catch (e) { AN = false; }
     return AN;
   }
-  audio.addEventListener("play", () => { if (lsVis() || AN) anInit(); if (AN && AN.ctx.state !== "running") AN.ctx.resume().catch(() => {}); });
+  audio.addEventListener("play", () => { anInit(); if (AN && AN.ctx.state !== "running") AN.ctx.resume().catch(() => {}); });
   function anLevel() {   // 0..1 loudness of what is playing right now, or -1 when nothing can be measured
     if (!AN || !A.on || A.paused || A.sim || AN.ctx.state !== "running") return -1;
     AN.an.getByteTimeDomainData(AN.buf); let sum = 0; for (let i = 0; i < AN.buf.length; i += 2) { const v = (AN.buf[i] - 128) / 128; sum += v * v; }
@@ -1297,6 +1295,18 @@
     if (sp > 0 || LS.amp > 0) LS.raf = requestAnimationFrame(lsLoop);
   }
   function lsKick() { if (!LS.raf) { LS.last = 0; LS.raf = requestAnimationFrame(lsLoop); } }
+  /* the bottom play button follows the voice the way the stage's big button used to: --amp (0..1, the level the stage uses) drives its ring and glow, in every view */
+  const plPlayEl = $("#plPlay"); let plRaf = 0, plAmp = 0;
+  function plLoop(now) {
+    plRaf = 0; if (document.hidden) return;
+    const on = A.on && !A.paused && !plBox.hidden; let target = 0;
+    if (on) { const lv = anLevel(); target = lv >= 0 ? lv : .18 + .14 * Math.sin(now * .003); }
+    if (lsVis()) plAmp = LS.amp; else { plAmp += (target - plAmp) * (target > plAmp ? .35 : .08); if (plAmp < .002) plAmp = 0; }
+    plPlayEl.style.setProperty("--amp", plAmp.toFixed(3));
+    if (on || plAmp > 0) plRaf = requestAnimationFrame(plLoop);
+  }
+  const plKick = () => { if (!plRaf) plRaf = requestAnimationFrame(plLoop); };
+  ["play", "pause", "ended"].forEach(ev => audio.addEventListener(ev, plKick));
   new ResizeObserver(() => { if (lsVis()) { lsSize(); lsFit(); } }).observe(lsEl);
   document.addEventListener("visibilitychange", () => { if (!document.hidden && lsVis()) lsKick(); });
   new MutationObserver(() => lsDraw(0)).observe(root, { attributes: true, attributeFilter: ["class"] });   // day / night: redraw at once, even while paused
@@ -1357,6 +1367,7 @@
     if (readTr()) await loadTr(S.rdTr);
     syncView(); syncTrChip(); syncReciters(); await reRender();
     if (view === "listen") { if (A.on) replay(); else togglePlay(); }
+    drawTabs();
     announce(`${(MODES.flatMap(m => m.subs || [m]).find(x => x.id === id) || {}).name} mode`);
   }
   mChips.addEventListener("click", e => {
@@ -1368,8 +1379,70 @@
     const b = e.target.closest("[data-s]"); if (b) applyMode(b.dataset.s);
   });
   $("#modesX").onclick = putAwayModes;
-  $("#btnModes").onclick = () => { showTools(false); showModes(true, true); };
   $(".brand").addEventListener("click", e => { if (EMBED) return; e.preventDefault(); openSurah(1, 1, { via: "home" }); showModes(true); });   // the logo is the way "home": the landing page and its note
+
+  /* ---------- mode tabs on the book: Read, Understand, Listen, Memorise. Placement: top (default), side or none (then the options bar shows a Mode menu button) ---------- */
+  var mtNav = document.createElement("nav"); mtNav.className = "modetabs"; mtNav.id = "modeTabs"; mtNav.setAttribute("aria-label", "Reading mode"); $("#book").appendChild(mtNav);
+  var mtMenu = document.createElement("div"); mtMenu.className = "mtmenu"; mtMenu.id = "mtMenu"; mtMenu.setAttribute("role", "menu"); mtMenu.hidden = true; $("#book").appendChild(mtMenu);
+  let mtFrom = null, mtCur = "read";
+  const TABSET = ["top", "side", "none"];
+  const tabsNorm = v => { v = String(v == null ? "" : v).toLowerCase(); return v === "left" ? "side" : ["hidden", "off", "0", "false"].includes(v) ? "none" : TABSET.includes(v) ? v : "top"; };
+  function mtVariant(v, save) {
+    if (v == null) v = qs.get("tabs") ?? store.get("tabs") ?? window.GQ_TABS;   // the address wins, then the visitor's own choice, then the site's default
+    v = tabsNorm(v); if (save) store.set("tabs", v);
+    TABSET.forEach(x => root.classList.toggle("mt-" + x, x === v)); mtClose(); $("#optTabs").value = v;
+  }
+  function drawTabs() {
+    if (!mtNav) return; if (mtMenu && !mtMenu.hidden) mtClose(); root.classList.remove("mt-tuck");   // a view or mode change brings the tabs back
+    const cur = mtCur = S.view === "listen" ? (A.times === 3 ? "memorise" : "listen") : S.view === "read" && S.rd === "tr" ? "understand" : "read";   // what the page is actually showing
+    mtNav.innerHTML = MODES.map(m => `<button type="button" class="mtab${m.id === cur ? " on" : ""}" data-m="${m.id}" ${m.subs ? 'aria-haspopup="menu" aria-expanded="false"' : `aria-pressed="${m.id === cur}"`} title="${esc(m.name)}${m.subs ? " (choose)" : ""}"><svg viewBox="0 0 24 24" aria-hidden="true">${MICON[m.id]}</svg><span>${esc(m.name)}</span>${m.subs ? '<svg class="mt-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5"/></svg>' : ""}</button>`).join("");
+  }
+  /* a menu under a tab or under the Mode button; nothing changes until a choice is made */
+  function mtClose(back) {
+    if (mtMenu.hidden) return; mtMenu.hidden = true;
+    document.querySelectorAll(".mtab[aria-expanded=true], #segView [aria-expanded=true]").forEach(b => b.setAttribute("aria-expanded", "false"));
+    if (back && mtFrom) mtFrom.focus({ preventScroll: true }); mtFrom = null;
+  }
+  function mtShow(b, html, side, cls) {
+    mtMenu.className = "mtmenu" + (cls ? " " + cls : ""); mtMenu.innerHTML = html; mtMenu.hidden = false; mtFrom = b; b.setAttribute("aria-expanded", "true");
+    const bk = $("#book").getBoundingClientRect(), r = b.getBoundingClientRect(), w = mtMenu.offsetWidth, h = mtMenu.offsetHeight;
+    let x = side ? r.right - bk.left + 8 : r.left - bk.left, y = side ? r.top - bk.top : r.bottom - bk.top + 6;
+    x = Math.max(6, Math.min(x, bk.width - w - 6)); y = Math.max(6, Math.min(y, bk.height - h - 6)); mtMenu.style.left = x + "px"; mtMenu.style.top = y + "px";
+    const f = mtMenu.querySelector(".mtm.cur") || mtMenu.querySelector(".mtm"); f && f.focus({ preventScroll: true });
+  }
+  const mtItem = (id, name, text, cur, def) => `<button type="button" role="menuitem" class="mtm${cur ? " cur" : ""}" data-s="${id}" title="${esc(text)}"><b>${esc(name)}${def ? "<em>Default</em>" : ""}</b><span>${esc(text)}</span></button>`;
+  mtNav.addEventListener("click", e => {
+    const b = e.target.closest(".mtab"); if (!b) return; const m = MODES.find(x => x.id === b.dataset.m);
+    if (!m.subs) { mtClose(); applyMode(m.id); return; }
+    if (b.getAttribute("aria-expanded") === "true") { mtClose(true); return; }
+    mtClose(); showModes(false); const now = mCur();
+    mtShow(b, `<p class="mtm-h">${esc(m.name)}: choose one</p>` + m.subs.map(s => mtItem(s.id, s.name, s.text, s.id === now, s.def)).join(""), root.classList.contains("mt-side"));
+  });
+  /* the options bar's View segment: Listen has choices too, so it opens the same menu under the button (Verse by verse and Reading have none) */
+  $("#segView").addEventListener("click", e => {
+    const b = e.target.closest("[data-v=listen]"); if (!b) return; e.stopPropagation();
+    if (b.getAttribute("aria-expanded") === "true") { mtClose(true); return; }
+    mtClose(); showModes(false); const now = mCur(), L = MODES.find(x => x.id === "listen");
+    mtShow(b, `<p class="mtm-h">Listen: choose one</p>` + L.subs.map(s => mtItem(s.id, s.name, s.text, s.id === now && mtCur === "listen", s.def)).join(""));
+  }, true);
+  mtMenu.addEventListener("click", e => { const b = e.target.closest("[data-s]"); if (b) { mtClose(); applyMode(b.dataset.s); } });
+  document.addEventListener("pointerdown", e => { if (!mtMenu.hidden && !e.target.closest("#mtMenu, .mtab, #segView [data-v=listen]")) mtClose(); });
+  document.addEventListener("keydown", e => {
+    if (mtMenu.hidden) return;
+    if (e.key === "Escape") { e.stopPropagation(); mtClose(true); }
+    else if (e.key === "ArrowDown" || e.key === "ArrowUp") { const it = [...mtMenu.querySelectorAll(".mtm")], i = it.indexOf(document.activeElement); e.preventDefault(); it[(i + (e.key === "ArrowDown" ? 1 : it.length - 1)) % it.length].focus(); }
+  }, true);
+  { const grip = document.createElement("button"); grip.type = "button"; grip.className = "mt-grip"; grip.setAttribute("aria-label", "Show the mode tabs"); $("#reader").appendChild(grip);
+    let last = 0, acc = 0;
+    const tuck = on => { if (root.classList.contains("mt-tuck") === on) return; root.classList.toggle("mt-tuck", on); if (on) mtClose(); setTimeout(() => recalc(), 300); };
+    scroller.addEventListener("scroll", () => {
+      const y = scroller.scrollTop, d = y - last; last = y; if (!d) return;
+      acc = Math.sign(d) === Math.sign(acc) ? acc + d : d;
+      if (acc > 60 && y > 160) { tuck(true); acc = 0; } else if (acc < -28 || y < 40) { tuck(false); acc = 0; }
+    }, { passive: true });
+    grip.onclick = () => tuck(false); }
+  $("#optTabs").onchange = e => { stat("setting_change", { setting: "tabs", value: e.target.value }); mtVariant(e.target.value, true); requestAnimationFrame(recalc); };
+  drawTabs(); mtVariant();
 
   /* ---------- go ---------- */
   async function init() {
