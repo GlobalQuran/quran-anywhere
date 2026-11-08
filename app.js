@@ -1240,17 +1240,13 @@
     lsDraw(0);
   }
   const P2 = Math.PI * 2;
-  function lsPetals(g, cx, cy, r0, r1, n, rot) {   // n pointed-arch petals between radii r0 and r1 (the shamsa of illuminated manuscripts)
-    const P = (r, a) => [cx + Math.cos(a) * r, cy + Math.sin(a) * r], half = Math.PI / n * .86, d = r1 - r0;
-    for (let i = 0; i < n; i++) {
-      const a = rot + i * P2 / n, st = P(r0, a); g.beginPath(); g.moveTo(...st);
-      g.bezierCurveTo(...P(r0 + d * .3, a - half * 1.05), ...P(r0 + d * .72, a - half * .55), ...P(r1, a));
-      g.bezierCurveTo(...P(r0 + d * .72, a + half * .55), ...P(r0 + d * .3, a + half * 1.05), ...st); g.stroke();
-    }
+  function lsStar(g, cx, cy, r, n, step, rot) {   // the {n/step} star polygon: every vertex joined to the one `step` further round
+    g.beginPath();
+    for (let i = 0; i < n; i++) { const a = rot + i * P2 / n, b = rot + ((i + step) % n) * P2 / n; g.moveTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r); g.lineTo(cx + Math.cos(b) * r, cy + Math.sin(b) * r); }
+    g.stroke();
   }
-  function lsCrescent(g, cx, cy, r, rot) {   // a crescent: the outer arc and a smaller arc set off toward the horns
-    const ox = Math.cos(rot) * r * .36, oy = Math.sin(rot) * r * .36;
-    g.beginPath(); g.arc(cx, cy, r, rot + .55, rot - .55 + P2, false); g.arc(cx + ox, cy + oy, r * .78, rot - .62 + P2, rot + .62, true); g.closePath(); g.stroke();
+  function lsKhatam(g, cx, cy, r, rot) {   // a small eight-pointed star: two squares
+    g.beginPath(); for (let k = 0; k < 2; k++) for (let i = 0; i <= 4; i++) { const a = rot + k * Math.PI / 4 + i * Math.PI / 2, x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r; i ? g.lineTo(x, y) : g.moveTo(x, y); } g.stroke();
   }
   function lsDraw(dt) {
     const g = lsCv.getContext("2d"), w = lsCv.width, h = lsCv.height; if (!w) return;
@@ -1271,26 +1267,19 @@
     g.restore();
     /* the surah's name in calligraphy, as a watermark behind everything */
     if (LS.s && document.fonts && document.fonts.check("20px SurahNames")) { g.save(); g.font = `${Math.round(R * .9)}px SurahNames`; g.textAlign = "center"; g.textBaseline = "middle"; g.fillStyle = `rgba(${col},${((night ? .1 : .085) + amp * .05).toFixed(3)})`; g.fillText(pad3(LS.s), cx, cy); g.restore(); }
-    /* curves only, no star or polygon anywhere: rings of pointed-arch petals (16, 32, 40) turning against each other and breathing with the voice */
+    /* girih rings: interlaced star polygons turning against each other (eight-fold family only) */
     g.lineJoin = "round"; g.lineCap = "round";
-    const rings = [[.13, .3, 16, -1], [.3, .5, 32, 1], [.7, .96, 40, -1]];
-    rings.forEach(([a0, a1, n, dir], k) => {
-      const sw = 1 + .02 * Math.sin(ph * .0009 + k) + amp * .03, al = ((night ? .26 : .22) - k * .04) * (.75 + amp * .5);
-      g.lineWidth = (k % 2 ? 1.2 : .9) * u; g.strokeStyle = `rgba(${col},${al.toFixed(3)})`;
-      lsPetals(g, cx, cy, R * a0 * sw, R * a1 * sw, n, ph * .00005 * dir * (1 + k * .12) + k * .2);
-      g.lineWidth = .7 * u; g.strokeStyle = `rgba(${col},${(al * .5).toFixed(3)})`; g.beginPath(); g.arc(cx, cy, R * a1 * sw, 0, P2); g.stroke();
+    const rings = [[.2, 8, 3, -1], [.34, 16, 6, 1], [.5, 16, 5, -1], [.68, 32, 12, 1], [.88, 32, 13, -1]];   // 8-, 16- and 32-fold only: never a count divisible by 3, whose crossings form six-pointed figures
+    rings.forEach(([f, n, st, dir], k) => {
+      const r = R * f * (1 + .02 * Math.sin(ph * .0009 + k) + amp * .03), al = ((night ? .26 : .22) - k * .035) * (.75 + amp * .5);
+      g.lineWidth = (k === 1 || k === 3 ? 1.3 : .9) * u; g.strokeStyle = `rgba(${col},${al.toFixed(3)})`;
+      lsStar(g, cx, cy, r, n, st, ph * .00005 * dir * (1 + k * .12) + k * .3);
+      g.lineWidth = .7 * u; g.strokeStyle = `rgba(${col},${(al * .5).toFixed(3)})`; g.beginPath(); g.arc(cx, cy, r, 0, P2); g.stroke();
     });
-    /* a band of interlocking rings between the petal rings (the chain border of manuscript frames) */
-    { const n = 20, rr = R * .6, cr = rr * Math.PI / n * 1.25, al = (night ? .2 : .17) * (.8 + amp * .4); g.lineWidth = .8 * u; g.strokeStyle = `rgba(${col},${al.toFixed(3)})`;
-      for (let i = 0; i < n; i++) { const a = -ph * .00003 + i * P2 / n; g.beginPath(); g.arc(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr, cr, 0, P2); g.stroke(); } }
-    /* the centre: three breathing circles and a point of light */
-    { const mr = R * .1 * (1 + amp * .08), ma = (night ? .3 : .24) * (.7 + amp * .6);
-      for (let k = 0; k < 3; k++) { g.lineWidth = (k ? .8 : 1.2) * u; g.strokeStyle = `rgba(${col},${(ma * (1 - k * .25)).toFixed(3)})`; g.beginPath(); g.arc(cx, cy, mr * (1 - k * .28), 0, P2); g.stroke(); }
-      g.fillStyle = `rgba(${col},${Math.min(1, .35 + amp * .5).toFixed(3)})`; g.beginPath(); g.arc(cx, cy, (1.6 + amp * 2) * u, 0, P2); g.fill(); }
-    /* sixteen small crescents drifting round the outer band */
+    /* a ring of sixteen small khatams orbiting between the middle rings */
     for (let i = 0; i < 16; i++) {
-      const a = ph * .00004 + i * P2 / 16, r = R * .6, x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r;
-      g.lineWidth = .9 * u; g.strokeStyle = `rgba(${col},${Math.min(1, (night ? .32 : .26) * (.6 + .4 * Math.sin(ph * .002 + i)) + amp * .2).toFixed(3)})`; lsCrescent(g, x, y, R * .026, a + Math.PI / 2);
+      const a = ph * .00004 + i * P2 / 16, r = R * .59, x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r;
+      g.lineWidth = .9 * u; g.strokeStyle = `rgba(${col},${Math.min(1, (night ? .3 : .24) * (.6 + .4 * Math.sin(ph * .002 + i)) + amp * .2).toFixed(3)})`; lsKhatam(g, x, y, R * .035, -a * 2);
     }
     /* motes drifting up, a few of them twinkling */
     if (LS.motes) for (const m of LS.motes) {
