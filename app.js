@@ -453,6 +453,7 @@
       if (ayah > 1 && S.view === "verse" && ["start", "link"].includes(opts.via) && $("#a" + ayah, inner)) selectAyah(ayah, true);   // arriving by a link: the verse is chosen and its buttons are showing
       LZ.last = scroller.scrollTop; LZ.dir = 1; updateCurrent(); realizeWindow(); });
     const cur = $("#surahList button.cur"); if (cur && !opts.noList) cur.scrollIntoView({ block: "nearest" });
+    window.GQOff && GQOff.onSurah(n);
   }
   $("#btnPrevS").onclick = () => openSurah(S.s - 1, 1, { via: "arrows" }); $("#btnNextS").onclick = () => openSurah(S.s + 1, 1, { via: "arrows" });
   inner.addEventListener("click", e => {
@@ -886,7 +887,8 @@
   $("#btnMenu").onclick = toggleMenu; $("#scrim").onclick = closeMenu;
   $$(".side-tabs button").forEach(b => b.onclick = () => { $$(".side-tabs button").forEach(x => x.classList.toggle("on", x === b)); $$(".tab").forEach(t => t.classList.toggle("on", t.id === "tab-" + b.dataset.tab)); if (b.dataset.tab === "marks") drawMarks(); });
   function buildSurahList() {
-    $("#pickList").innerHTML = $("#surahList").innerHTML = S.data.surahs.map(m => `<li><button data-s="${m.n}" data-q="${esc((m.n + " " + m.en + " " + m.me + " " + m.ar).toLowerCase())}"><span class="s-no">${m.n}</span><span class="s-nm">${esc(m.en)}<small>${esc(m.me)} · ${m.c} verses</small></span><span class="s-ar sn" aria-hidden="true">${pad3(m.n)}</span></button></li>`).join("");
+    $("#pickList").innerHTML = $("#surahList").innerHTML = S.data.surahs.map(m => `<li><button data-s="${m.n}" data-q="${esc((m.n + " " + m.en + " " + m.me + " " + m.ar).toLowerCase())}"><span class="s-no">${m.n}</span><span class="s-nm">${esc(m.en)}<small>${esc(m.me)} · ${m.c} verses</small></span><span class="s-ar sn" aria-hidden="true">${pad3(m.n)}</span></button>${window.GQOff ? GQOff.rowHtml(m.n) : ""}</li>`).join("");   // the offline status sits beside each surah (offline.js)
+    window.GQOff && GQOff.rows();
   }
   $("#surahList").addEventListener("click", e => { const b = e.target.closest("[data-s]"); if (b) openSurah(+b.dataset.s, 1, { via: "sidebar" }); });
   $("#surahFilter").addEventListener("input", e => {
@@ -917,11 +919,12 @@
   $("#segRd").addEventListener("click", e => { const b = e.target.closest("[data-v]"); if (b && b.dataset.v !== S.rd) setRd(b.dataset.v); });
 
   /* ---------- on-page popovers: reading options + quick surah picker ---------- */
-  const POPS = { picker: [$("#picker"), $("#cartBtn")], trpick: [$("#trpick"), $("#trChip")], voices: [$("#voices"), $("#plVoices")] };
+  const POPS = { picker: [$("#picker"), $("#cartBtn")], trpick: [$("#trpick"), $("#trChip")], voices: [$("#voices"), $("#plVoices")], offline: [$("#offpop"), $("#btnOff")] };
   function closePops(except) { for (const k in POPS) { if (k === except) continue; const [p, b] = POPS[k]; p.hidden = true; b.setAttribute("aria-expanded", "false"); } }
   function togglePop(k) {
     const [p, b] = POPS[k], open = p.hidden; if (open) stat("open_panel", { panel: k }); closePops(open ? k : null); p.hidden = !open; b.setAttribute("aria-expanded", open);
     if (!open) return; showKey(false);
+    if (k === "offline") window.GQOff && GQOff.renderPop();
     if (k === "trpick") openTrPick();
     if (k === "picker") { const f = $("#pickFilter"); f.value = ""; $$("#pickList li").forEach(li => { li.hidden = false; }); const cur = $("#pickList button.cur"); cur && cur.scrollIntoView({ block: "center" }); if (matchMedia("(hover:hover)").matches) f.focus({ preventScroll: true }); }
   }
@@ -930,7 +933,7 @@
   new ResizeObserver(() => root.style.setProperty("--sh", sub.hidden ? "0px" : sub.offsetHeight + "px")).observe(sub);
   $("#btnTools").onclick = () => showTools(sub.hidden); $("#btnToolsX").onclick = () => showTools(false);
   $("#cartBtn").onclick = () => togglePop("picker"); $("#plVoices").onclick = () => togglePop("voices");
-  addEventListener("pointerdown", e => { if (!e.target.closest(".pop, #cartBtn, #trChip, #plVoices")) closePops(); });
+  addEventListener("pointerdown", e => { if (!e.target.closest(".pop, #cartBtn, #trChip, #plVoices, #btnOff")) closePops(); });
   $("#pickList").addEventListener("click", e => { const b = e.target.closest("[data-s]"); if (b) { closePops(); openSurah(+b.dataset.s, 1, { via: "picker" }); } });
   $("#pickFilter").addEventListener("input", e => {
     const q = e.target.value.trim().toLowerCase().replace(/[-']/g, "");
@@ -1093,6 +1096,7 @@
     const t = e.target, k = e.key, key = k.length === 1 ? k.toLowerCase() : k;
     if (t.closest && t.closest("input, select, textarea, [contenteditable=''], [contenteditable='true']")) { if (key !== "Escape" || (t.type === "search" && t.value)) return; t.blur(); }   // never take keys away from typing; Esc in an empty search box closes the panel it is in (a box with text is cleared by the browser first)
     const help = key === "?" || (key === "/" && e.shiftKey);   // "?" is Shift + / on most keyboards
+    if (window.GQOff && GQOff.modalOpen()) return;   // the Offline library (and its small dialogs) handle their own keys
     if (kbdOpen()) { if (key === "Escape" || help) { e.preventDefault(); closeKbd(); } else if (key === "Tab") trapTab(e, kbdEl); return; }
     if (!$("#oops").hidden || !$("#privacy").hidden) return;
     if (help) { e.preventDefault(); return openKbd(); }
@@ -1629,6 +1633,16 @@
     if (!s && store.get("pos")) { const p = store.get("pos").split(":"); s = +p[0]; a = +p[1] || 1; }
     s = clamp(s || 1, 1, 114); a = clamp(a, 1, meta(s).c);
     syncView(); syncTrChip(); syncReciters();
+    /* offline (offline.js): what only this file knows is handed over once; the cloud in the header, the status on each surah and the library are drawn there */
+    if (window.GQOff && !EMBED) GQOff.attach({
+      assets: ASSETS, colr: COLR, surahs: () => S.data.surahs, cur: () => S.s, closePops, togglePop, toast, stat,
+      textIds: () => [...new Set(["quran-uthmani", "quran-tajweed", ...S.trs, ...(S.rdTr ? [S.rdTr] : []), ...(TL.on && TL.id ? [TL.id] : [])])],   // every edition the page can draw
+      voices: () => {   // the voices the player would use: the Quran reciter, the translation voice, or the default reciter when both are off
+        const ids = []; if (A.reciter) ids.push(A.reciter); const t = trRecId(); if (t && !ids.includes(t)) ids.push(t); if (!ids.length) ids.push("ar.alafasy");
+        return ids.map(id => { const q = RECITERS.find(r => r[0] === id), r = TR_REC.find(x => x[0] === id), v = audioVariants(id)[0] || audioVariant(id); return { id, kbs: v.kbs, name: q ? q[1] : r ? `${r[4]} (${r[1].toUpperCase()})` : id }; });
+      },
+      audioUrl: (id, g) => audioFile(id, g, 0), marks: () => bms.map(k => +String(k).split(":")[0])
+    });
     const opening = openSurah(s, a, { flash: false, via: "start" });
     if (!EMBED && !route.s && !route.page && !route.eds.length && route.search == null && !store.get("pos") && !store.get("modes")) showModes(true);   // very first visit, landing page
     if (window.GQA) GQA.start({ mode: store.get("mode") || "default", entry: route.search != null ? "search_link" : route.page ? "page_link" : route.eds.length ? "edition_link" : route.s ? "link" : store.get("pos") ? "resume" : "new", view: S.view, show: S.view === "read" ? S.rd : "both", font: FONT, theme: S.theme, tajweed: TJ.on ? "on" : "off", translit: TL.on ? TL.id : "off", translations: S.trs.length, tr_lang: (S.trs[0] || "none").split(".")[0], device: innerWidth < 720 ? "phone" : innerWidth < 1100 ? "tablet" : "desktop" });

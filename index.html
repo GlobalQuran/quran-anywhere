@@ -26,7 +26,7 @@ window.gq = window.gq || { _quran: [], setConfig: function (c) { window.GQ_LEGAC
 <meta name="theme-color" content="#1a2224">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Global Quran">
-<link rel="stylesheet" href="app.css?v=95">
+<link rel="stylesheet" href="app.css?v=98">
 </head>
 <body>
 <a class="skip" id="skip" href="#">Skip to the Quran text</a>
@@ -95,6 +95,7 @@ window.gq = window.gq || { _quran: [], setConfig: function (c) { window.GQ_LEGAC
             <button class="cz cz-r" id="btnNextS" aria-label="Next surah" title="Next surah"></button>
           </div></div>
           <div class="hgrp">
+            <button class="hbtn" id="btnOff" type="button" aria-label="Offline" aria-haspopup="dialog" aria-expanded="false" aria-controls="offpop" hidden></button>
             <button class="hbtn" id="btnTheme" aria-label="Day / night"><svg><use href="img/sprite.svg#i-moon"/></svg></button>
             <button class="hbtn" id="btnTools" aria-label="Reading options" aria-expanded="false" aria-controls="tools"><svg><use href="img/sprite.svg#i-gear"/></svg></button>
           </div>
@@ -224,6 +225,17 @@ window.gq = window.gq || { _quran: [], setConfig: function (c) { window.GQ_LEGAC
           <label class="vc-row vc-tr"><span>Translation</span><select id="plTrRec" aria-label="Translation reciter"></select></label>
           <div class="vc-row"><span>Speed</span><span class="seg" id="plSpeedSeg"><button data-v="0.75">0.75×</button><button data-v="1">1×</button><button data-v="1.25">1.25×</button><button data-v="1.5">1.5×</button></span></div>
         </div>
+        <!-- offline: the panel under the header cloud (this surah), the progress card, the library and its small dialogs; all drawn by offline.js -->
+        <div class="pop offpop" id="offpop" role="dialog" aria-label="Save for offline" hidden></div>
+        <div class="ol" id="offlib" role="dialog" aria-modal="true" aria-labelledby="olT" hidden>
+          <div class="ol-card">
+            <div class="ol-h"><div><h2 id="olT">Offline library</h2><p id="olSub"></p></div><button type="button" class="icon-btn" id="olClose" data-oa="libx" aria-label="Close the offline library"><svg><use href="img/sprite.svg#i-close"/></svg></button></div>
+            <div class="ol-body"><div class="ol-side" id="olSide"></div><div class="ol-main"><div id="olProg"></div><div id="olTb"></div><div class="ol-grid" id="olGrid"></div></div></div>
+            <div class="ol-foot" id="olFoot"></div>
+          </div>
+        </div>
+        <div class="om" id="offmini" role="dialog" aria-modal="true" hidden></div>
+        <div class="offdock" id="offdock" role="status" hidden></div>
         <div class="pop picker" id="picker" role="dialog" aria-label="Choose a surah" hidden>
           <label class="psearch"><svg><use href="img/sprite.svg#i-search"/></svg><input type="search" id="pickFilter" placeholder="Search surah or number" autocomplete="off"></label>
           <ul class="plist" id="pickList"></ul>
@@ -275,7 +287,8 @@ window.gq = window.gq || { _quran: [], setConfig: function (c) { window.GQ_LEGAC
 <audio id="audio" preload="none" crossorigin="anonymous"></audio>
 <script src="gq-api.js?v=3"></script>
 <script src="analytics.js?v=2"></script>
-<script src="app.js?v=96"></script>
+<script src="offline.js?v=4"></script>
+<script src="app.js?v=98"></script>
 <script src="site.js?v=11"></script>
 </body>
 </html>
