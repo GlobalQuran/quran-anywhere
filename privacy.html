@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, viewport-fit=cover">
+<title>Privacy · Global Quran</title>
+<meta name="description" content="What the Global Quran website, the Meta Quest app and the Apple Vision Pro app do and do not collect.">
+<link rel="canonical" href="https://globalquran.com/privacy">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="/img/icons/favicon-32.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/img/icons/apple-touch-icon.png">
+<meta name="theme-color" content="#1a2224">
+<script>
+/* the same day / night choice as the reader (gq2.theme = day | night | auto) */
+(function () {
+  var t = null; try { t = localStorage.getItem("gq2.theme"); } catch (e) {}
+  if (t === "night" || (t !== "day" && window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches)) document.documentElement.classList.add("night");
+}());
+</script>
+<style>
+/* A standalone page in the reader's own look: the same tokens as app.css (gold, paper, ink), the Fontin brand face, a golden-framed paper card. */
+@font-face { font-family: "AmiriQuran"; src: url(/fonts/AmiriQuran-Regular.ttf) format("truetype"); font-display: swap; }
+@font-face { font-family: "Fontin"; font-weight: 700; src: url(/fonts/Fontin-Bold.ttf); font-display: swap; }
+:root {
+  --gold: #a58a3a; --gold-fill: #866e1f; --accent: #d5b75b; --cite: #8a7027;
+  --ink: #131313; --tr-ink: #3f3f3f; --line: #d4d2c8; --head: #2b2b2b;
+  --paper-c: #fbfbf9; --paper-b: #f4f4f1;
+  --ctl-bg: rgba(255,255,255,.55); --ctl-hover: rgba(165,138,58,.14); --sel: rgba(165,138,58,.2);
+  --ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --serif: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Palatino, Georgia, "Times New Roman", serif;
+  --brand: Fontin, Georgia, serif;
+  --t: .18s; --r: 10px;
+  --bg: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='112' height='112' viewBox='0 0 112 112'><g fill='none' stroke='%23fff' stroke-opacity='.14' stroke-width='.9'><circle cx='56' cy='56' r='34'/><circle cx='0' cy='0' r='34'/><circle cx='112' cy='0' r='34'/><circle cx='0' cy='112' r='34'/><circle cx='112' cy='112' r='34'/><circle cx='56' cy='56' r='6'/></g></svg>") center top / 112px 112px, linear-gradient(180deg, #6f8584 0, #a3b3ab 40%, #ced8ce 100%);
+  --on-bg: #1f2a2b; --on-bg-soft: rgba(31,42,43,.72);
+}
+html.night {
+  --ink: #efe9d6; --tr-ink: #c2cac8; --line: #465052; --head: #e6e9e7; --cite: #cfb35a;
+  --paper-c: #2e383a; --paper-b: #263032;
+  --ctl-bg: rgba(255,255,255,.06); --ctl-hover: rgba(213,183,91,.16); --sel: rgba(213,183,91,.18);
+  --bg: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='112' height='112' viewBox='0 0 112 112'><g fill='none' stroke='%23debe60' stroke-opacity='.08' stroke-width='.9'><circle cx='56' cy='56' r='34'/><circle cx='0' cy='0' r='34'/><circle cx='112' cy='0' r='34'/><circle cx='0' cy='112' r='34'/><circle cx='112' cy='112' r='34'/><circle cx='56' cy='56' r='6'/></g></svg>") center top / 112px 112px, linear-gradient(180deg, #1d2a2d 0, #141e20 45%, #0d1516 100%);
+  --on-bg: #e9efee; --on-bg-soft: rgba(233,239,238,.7);
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: 76px; }
+body { margin: 0; min-height: 100vh; background: #1d2628; background: var(--bg); background-attachment: fixed; color: var(--tr-ink); font: 16px/1.7 var(--ui); -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+::selection { background: rgba(213,183,91,.35); }
+a { color: var(--cite); text-underline-offset: 3px; } html.night a { color: var(--accent); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+
+.wrap { width: min(760px, 100%); margin: 0 auto; padding: 18px 16px 64px; padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right)); }
+.top { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0 0 22px; }
+.pill { display: inline-flex; align-items: center; gap: 7px; height: 38px; padding: 0 16px; border-radius: 19px; border: 1px solid transparent; background: var(--ctl-bg); color: var(--on-bg); font: 700 13px var(--ui); text-decoration: none; cursor: pointer; backdrop-filter: blur(6px); transition: background var(--t), border-color var(--t); }
+html:not(.night) .pill { border-color: rgba(31,42,43,.14); }
+.pill:hover { background: var(--ctl-hover); border-color: var(--gold); }
+html.night a.pill, a.pill { color: var(--on-bg); }
+.pill svg { width: 16px; height: 16px; stroke: currentColor; stroke-width: 2; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+
+.hero { text-align: center; margin: 4px 0 26px; color: var(--on-bg); }
+.brand { display: inline-flex; align-items: baseline; gap: 10px; text-decoration: none; }
+.brand .ar { display: inline-block; padding: 0 .18em; font: 40px/1.5 "AmiriQuran", serif;background: linear-gradient(180deg, #c9a944, #7d6318); -webkit-background-clip: text; background-clip: text; color: transparent; }
+html.night .brand .ar { background-image: linear-gradient(180deg, #f3de98, #c9a944); }
+.brand .en { font: 700 12px/1 var(--brand); letter-spacing: 3px; color: var(--on-bg); opacity: .85; }
+.hero h1 { margin: 6px 0 4px; font: 700 clamp(30px, 6vw, 40px)/1.15 var(--brand); letter-spacing: .01em; }
+.hero p { margin: 0 auto; max-width: 34em; font: 16px/1.6 var(--serif); font-style: italic; color: var(--on-bg-soft); }
+.orn { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 16px auto 0; color: var(--gold); }
+.orn::before, .orn::after { content: ""; width: min(90px, 22vw); height: 1px; background: linear-gradient(90deg, transparent, currentColor); }
+.orn::after { transform: scaleX(-1); }
+.orn i { width: 7px; height: 7px; background: currentColor; transform: rotate(45deg); }
+
+.jump { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin: 0 0 22px; }
+.jump .pill { height: 36px; font-size: 13px; }
+
+.card { margin: 0 0 18px; padding: 24px 28px 20px; border: 1px solid var(--gold); border-radius: 8px; background: var(--paper-c); color: var(--tr-ink); box-shadow: 0 12px 30px rgba(0,0,0,.2), inset 0 0 0 4px var(--paper-c), inset 0 0 0 5px rgba(165,138,58,.28); }
+html.night .card { box-shadow: 0 12px 30px rgba(0,0,0,.4), inset 0 0 0 4px var(--paper-c), inset 0 0 0 5px rgba(213,183,91,.22); }
+.card h2 { margin: 0 0 4px; font: 700 23px/1.25 var(--brand); color: var(--head); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.card h3 { margin: 22px 0 4px; font: 700 11px/1.3 var(--ui); letter-spacing: .16em; text-transform: uppercase; color: var(--cite); }
+html.night .card h3 { color: var(--accent); }
+.tag { font: 700 11px/1 var(--ui); letter-spacing: .08em; text-transform: uppercase; padding: 5px 9px; border-radius: 12px; background: var(--sel); color: var(--cite); }
+html.night .tag { color: var(--accent); }
+.card p { margin: 8px 0 0; }
+.card p.lead { font: 18px/1.65 var(--serif); color: var(--head); margin-top: 6px; }
+.card ul { margin: 8px 0 0; padding: 0; list-style: none; }
+.card li { position: relative; margin: 0 0 7px; padding-left: 22px; }
+.card li::before { content: ""; position: absolute; left: 4px; top: .72em; width: 6px; height: 6px; background: var(--gold); transform: rotate(45deg); }
+.card b { color: var(--head); font-weight: 700; }
+code { font: 13.5px ui-monospace, SFMono-Regular, Menlo, monospace; padding: 1px 6px; border-radius: 5px; background: var(--sel); color: var(--head); word-break: break-word; }
+.rule { height: 1px; margin: 18px 0 2px; border: 0; background: var(--line); }
+.when { text-align: center; margin: 24px 0 0; font: 13px var(--ui); color: var(--on-bg-soft); }
+
+@media (max-width: 520px) {
+  .card { padding: 20px 18px 16px; }
+  .card h2 { font-size: 21px; }
+  .brand .ar { font-size: 34px; }
+}
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } .pill { transition: none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <a class="pill" href="/"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>Back to the Quran</a>
+    <button class="pill" id="theme" type="button" aria-label="Switch between day and night"><svg viewBox="0 0 24 24" aria-hidden="true"><path id="themeIcon" d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z"/></svg><span id="themeTxt">Night</span></button>
+  </div>
+
+  <header class="hero">
+    <a class="brand" href="/" aria-label="Global Quran home"><span class="ar">العالمي</span><span class="en">GLOBAL QURAN</span></a>
+    <h1>Privacy</h1>
+    <p>What the website and our apps do with your information, in plain words. Each app has its own section.</p>
+    <div class="orn" aria-hidden="true"><i></i></div>
+  </header>
+
+  <nav class="jump" aria-label="Sections">
+    <a class="pill" href="#website">Website</a>
+    <a class="pill" href="#quest">Meta Quest</a>
+    <a class="pill" href="#vision-pro">Apple Vision Pro</a>
+  </nav>
+
+  <section class="card" id="short">
+    <h2>The short version</h2>
+    <p class="lead">Global Quran has no accounts, no advertising and nothing is ever sold. It does not follow you around other sites.</p>
+    <ul>
+      <li><b>No sign-in.</b> You never give us a name, an email or a password to read or listen.</li>
+      <li><b>No ads, no selling, no sharing for marketing.</b></li>
+      <li><b>Your places stay with you.</b> Your settings, your saved verses and where you stopped are kept on your own device, never on our servers.</li>
+      <li><b>Only the website counts visits</b>, anonymously, and in Europe and the UK only if you say yes. The apps for Meta Quest and Apple Vision Pro do not.</li>
+    </ul>
+
+    <h3>What our servers see (every app)</h3>
+    <p>To show a verse and play its recitation, the website and the apps download the Quran text, translations, fonts and audio from Global Quran servers (<code>api.globalquran.com</code>, <code>cdn.globalquran.com</code>, <code>audio.globalquran.com</code>). Like any website, those servers receive your IP address and the file asked for (for example, which surah), and keep ordinary, short-lived server logs used only to run and protect the service. We do not link these requests to who you are, and we do not sell or share them. Everything is served through Cloudflare, which handles the requests on our behalf under its own privacy terms.</p>
+  </section>
+
+  <section class="card" id="website">
+    <h2>Website <span class="tag">globalquran.com</span></h2>
+    <p>We use Google Analytics to count visits and to see which features are used (for example which surahs are opened, whether audio is played, and which settings are changed), so we can improve the reader.</p>
+    <p>It stores a small cookie on this site, is never used for advertising, and never records what you type, your list of saved verses, or anything that identifies you. It does note which verses are saved, copied or played (not by whom), so we can see which verses are the most loved. You can change your mind at any time, here or in Settings.</p>
+
+    <h3>Your choice</h3>
+    <ul>
+      <li>In the EU, the EEA, the UK and Switzerland nothing is loaded or stored until you press <b>Allow</b>. Elsewhere it runs from the start and you can switch it off in Settings (<b>Share anonymous usage statistics</b>).</li>
+      <li>If your browser sends Do Not Track or Global Privacy Control, statistics stay off.</li>
+      <li>Turning it off stops everything being sent and deletes the Google Analytics cookies.</li>
+      <li>We do not turn on Google signals or advertising features, and we do not use user IDs.</li>
+    </ul>
+
+    <h3>On your device</h3>
+    <p>Your choices (translation, font, theme, reciter), your saved verses and the place you stopped are stored in your browser on your device. They are not sent to us.</p>
+  </section>
+
+  <section class="card" id="quest">
+    <h2>Meta Quest <span class="tag">Global Quran VR</span></h2>
+    <p class="lead">Nothing about you is collected.</p>
+    <ul>
+      <li>No accounts, no advertising, no analytics and no tracking. It does not use your camera or microphone and does not save your settings or reading history.</li>
+      <li>Hand tracking, controllers and, if you choose the mixed-reality view, passthrough are handled on your headset in real time. They are not recorded, stored or sent to anyone.</li>
+      <li>It asks our servers only for the verses and audio it shows (see <em>What our servers see</em> above).</li>
+    </ul>
+    <p>The same policy is also kept on its own page, <a href="https://quest.globalquran.com/privacy.html">quest.globalquran.com/privacy.html</a>, which is the address given to Meta.</p>
+  </section>
+
+  <section class="card" id="vision-pro">
+    <h2>Apple Vision Pro <span class="tag">Global Quran Vision</span></h2>
+    <p class="lead">Nothing about you is collected. Its App Store privacy label says <b>Data Not Collected</b>.</p>
+    <ul>
+      <li>No account, no advertising, no analytics, no cookies and no tracking.</li>
+      <li><b>Hand tracking</b> is optional, asks your permission, and is used only on the device to turn the verse with a flick of the hand. It is never stored or sent anywhere.</li>
+      <li><b>Offline.</b> When you choose to save a surah or the whole Quran, the text, fonts, translation and recitations are kept on your device (and left out of backups). You are asked first, you can see what is saved, and you can remove it at any time in Settings or by deleting the app.</li>
+      <li><b>Sharing a verse</b> opens the system share sheet with a <code>globalquran.com</code> link. To have the preview picture ready, the app also asks our servers to prepare it for that verse, with the translation and reciter you chose. Nothing about you is in that request.</li>
+      <li><b>Optional contributions</b> are handled entirely by Apple's In-App Purchase. We never see your payment details, and giving unlocks nothing: every feature is free.</li>
+      <li>Verses and audio come from our servers (see <em>What our servers see</em> above).</li>
+    </ul>
+    <p>Global Quran Vision is published on the App Store by Noora Labs Ltd.</p>
+  </section>
+
+  <section class="card" id="more">
+    <h2>Children</h2>
+    <p>We do not knowingly collect any information from anyone, including children.</p>
+    <hr class="rule">
+    <h2>Changes</h2>
+    <p>If this changes, we will update this page and its date. An app that starts to collect anything new will say so here first.</p>
+    <hr class="rule">
+    <h2>Contact</h2>
+    <p>Questions about privacy? Use the <a href="https://docs.globalquran.com/contact">Contact page</a>.</p>
+  </section>
+
+  <p class="when">Last updated 9 November 2026</p>
+</div>
+<script>
+(function () {
+  var root = document.documentElement, btn = document.getElementById("theme"), txt = document.getElementById("themeTxt"), ico = document.getElementById("themeIcon");
+  var MOON = "M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z", SUN = "M12 4V2m0 20v-2m8-8h2M2 12h2m13.7-5.7 1.4-1.4M4.9 19.1l1.4-1.4m0-11.4L4.9 4.9m14.2 14.2-1.4-1.4M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z";
+  function show() { var n = root.classList.contains("night"); txt.textContent = n ? "Day" : "Night"; ico.setAttribute("d", n ? SUN : MOON); }
+  btn.addEventListener("click", function () {
+    var n = !root.classList.contains("night"); root.classList.toggle("night", n);
+    try { localStorage.setItem("gq2.theme", n ? "night" : "day"); } catch (e) {}
+    show();
+  });
+  show();
+}());
+</script>
+</body>
+</html>
