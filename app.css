@@ -533,7 +533,8 @@ html.night .oops-art .o-sun { display: none; } html.night .oops-art .o-moon { di
 html.night .oops-brand { color: var(--accent); }
 
 /* ---------- usage statistics: quiet card + details, inside the page frame (analytics.js) ---------- */
-.cookie { position: absolute; z-index: 4; left: 50%; transform: translateX(-50%); bottom: calc(var(--foot) + 14px); width: min(440px, calc(100% - 2 * (10px + 30px * var(--fz) + 8px))); display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 14px; padding: 9px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper-c); color: var(--tr-ink); font: 13px/1.35 var(--ui); box-shadow: 0 6px 18px rgba(0,0,0,.18); }
+/* the card sits above the foot and its top rule: --foot is the foot height + 10, but the foot itself is lifted by 10px + 30px * --fz + 4px */
+.cookie { position: absolute; z-index: 6; left: 50%; transform: translateX(-50%); bottom: calc(var(--foot) + 14px + 30px * var(--fz)); width: min(440px, calc(100% - 2 * (10px + 30px * var(--fz) + 8px))); display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 14px; padding: 9px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper-c); color: var(--tr-ink); font: 13px/1.35 var(--ui); box-shadow: 0 6px 18px rgba(0,0,0,.18); }
 html.night .cookie { background: #2e383a; color: #cfd8d7; border-color: rgba(255,255,255,.14); }
 .cookie[hidden], .privacy[hidden] { display: none; }
 .ck-b { display: flex; align-items: center; gap: 6px; margin-left: auto; }
