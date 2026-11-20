@@ -4,8 +4,8 @@
  * only keeps them on every device. Three places ask, none of them a wall:
  *   - a small card next to the Save button, right after a verse is saved (also in embeds, where sign-in opens in a window)
  *   - a Sign in card on the menu's Saved tab (once signed in, Sign out is at the top of Settings)
- *   - on a return visit, Google's "Continue as ..." card, or a small "pick up where you stopped" pill
- * Closing a card with its x hides asking for 3 days; after 3 closes it never asks again.
+ *   - on a return visit, Google's "Continue as ..." card; and from the 5th visit a small "pick up where you stopped" pill
+ * Closing a card with its x hides asking for 3 days; after 3 closes it never asks again. The pill has its own schedule (see below).
  *
  * Turn it off with ?login=0, window.GQ_LOGIN = false, or data-login="0" on the embed.
  * Embeds are on globalquran.com inside an iframe, so third-party cookies may be blocked: they sign in through a popup and
@@ -200,26 +200,42 @@
   }
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
-  /* ---------- return visits: Google's card, or a small pill ---------- */
-  let pill = null;
+  /* ---------- return visits: Google's card (2nd visit on), and a small "pick up where you stopped" pill (own schedule) ---------- */
+  let pill = null, pillShown = false;
   function closePill() { if (pill) { pill.remove(); pill = null; } }
+  /* The pill: first on the 5th visit. "Not now" brings it back only when the reader moves to another surah, after a week, then
+     after a month; after the third "Not now" it never comes back. Ignoring it (it fades after 20 s) counts for nothing. */
+  const PILL_WAIT = [0, 7, 30], PILL_MAX = 3;
+  const pillState = () => { try { return JSON.parse(kv.get("pill") || "{}"); } catch (e) { return {}; } };
+  function pillDue(onLoad) {
+    const st = pillState(), n = st.n || 0;
+    if (n >= PILL_MAX || pillShown || user || EMBED) return false;
+    if (n === 0) return onLoad && (+kv.get("visits") || 0) >= 5;
+    return !onLoad && Date.now() - (st.t || 0) >= PILL_WAIT[n] * 864e5;
+  }
   function showPill() {
     if (pill || user) return;
     const pos = App.store.get("pos"); if (!pos) return;
+    pillShown = true;
     pill = el("div", "sg-pill"); pill.setAttribute("role", "status");
-    pill.innerHTML = '<span>Pick up at <b>' + esc(pos) + '</b> on every device?</span><button class="ob pri sm" type="button">Sign in</button><button class="sg-link" type="button">Not now</button>';
+    pill.innerHTML = '<span>Pick up at <b>' + esc(pos) + '</b> on every device?</span><span class="sg-pb"><button class="ob pri sm" type="button">Sign in</button><button class="sg-link" type="button">Not now</button></span>';
     document.body.appendChild(pill);
     $(".ob", pill).onclick = () => startSignIn();
-    $(".sg-link", pill).onclick = () => { closedByUser(); closePill(); };
+    $(".sg-link", pill).onclick = () => { const st = pillState(); kv.set("pill", JSON.stringify({ n: (st.n || 0) + 1, t: Date.now() })); closePill(); };
     setTimeout(closePill, 20000);
   }
+  let lastSurah = 0;
+  addEventListener("gq:store", e => {
+    if (!e.detail || e.detail.k !== "pos") return;
+    const s = +String(App.store.get("pos") || "").split(":")[0];
+    if (lastSurah && s && s !== lastSurah && pillDue(false)) setTimeout(showPill, 800);
+    if (s) lastSurah = s;
+  });
   async function returnVisit() {
     if (EMBED || user || !mayAsk()) return;
     const p = await loadProviders();
-    if (user) return;
-    if (!(p.providers || []).includes("google") || !p.googleClientId) { showPill(); return; }
+    if (user || !(p.providers || []).includes("google") || !p.googleClientId) return;
     const s = document.createElement("script"); s.src = "https://accounts.google.com/gsi/client"; s.async = true;
-    s.onerror = showPill;
     s.onload = () => {
       try {
         google.accounts.id.initialize({
@@ -229,13 +245,8 @@
             checkSession(true);
           },
         });
-        google.accounts.id.prompt(n => {
-          try {
-            if (n.isNotDisplayed() || n.isSkippedMoment()) showPill();
-            else if (n.isDismissedMoment() && n.getDismissedReason() === "user_cancel") closedByUser();
-          } catch (e) { showPill(); }
-        });
-      } catch (e) { showPill(); }
+        google.accounts.id.prompt(n => { try { if (n.isDismissedMoment() && n.getDismissedReason() === "user_cancel") closedByUser(); } catch (e) {} });
+      } catch (e) {}
     };
     document.head.appendChild(s);
   }
@@ -252,6 +263,8 @@
     if (!user) {
       if (!ss.get("gq.visit")) { ss.set("gq.visit", "1"); kv.set("visits", String((+kv.get("visits") || 0) + 1)); }
       if ((+kv.get("visits") || 0) >= 2) setTimeout(returnVisit, 4000);   // never on a first visit
+      lastSurah = +String(App.store.get("pos") || "").split(":")[0] || 0;
+      if (pillDue(true)) setTimeout(showPill, 5000);
     }
   }
   start();
