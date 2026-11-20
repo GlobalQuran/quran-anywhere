@@ -202,6 +202,10 @@ window.GQOff = (() => {
   const online = () => navigator.onLine !== false;
   const state = n => Q.list.includes(n) ? (Q.list[0] === n ? "busy" : "wait") : isReady(n) ? "ready" : "none";
   const listenNames = () => api.voices().map(v => v.name).join(" + ");
+  /* a voice is named in English and, when it differs, in its own language and script (read right to left where it needs to) */
+  const nat = s => s ? `<span class="nat" dir="auto">${esc(s)}</span>` : "";
+  const vh = (name, native) => esc(name) + nat(native);
+  const listenHtml = () => api.voices().map(v => vh(v.name, v.native)).join(" + ");
   const surahName = n => surah(n).en;
   const pct = n => Math.round((Q.prog[n] || 0) * 100);
 
@@ -258,12 +262,12 @@ window.GQOff = (() => {
     } else if (!ST.asked) {
       h = `<h4>Save ${esc(s.en)} for offline</h4><p>It will open with no internet. Do you want to listen offline too?</p>
         <div class="op-opts"><button type="button" class="opt ${ST.listen ? "" : "on"}" role="radio" aria-checked="${!ST.listen}" data-oa="ls0"><i class="rd"></i><span><b>Read only</b><small>Arabic and your translation</small></span><em>${fmt(rd)}</em></button>
-        <button type="button" class="opt ${ST.listen ? "on" : ""}" role="radio" aria-checked="${ST.listen}" data-oa="ls1"><i class="rd"></i><span><b>Read and listen<span class="tag">Suggested</span></b><small>Plus the recitation by ${esc(listenNames())}</small></span><em>${fmt(rd + au)}</em></button></div>
+        <button type="button" class="opt ${ST.listen ? "on" : ""}" role="radio" aria-checked="${ST.listen}" data-oa="ls1"><i class="rd"></i><span><b>Read and listen<span class="tag">Suggested</span></b><small>Plus the recitation by ${listenHtml()}</small></span><em>${fmt(rd + au)}</em></button></div>
         <button type="button" class="ob pri wide" data-oa="save" data-n="${n}">${ic("cloud")}Save · ${fmt(rd + (ST.listen ? au : 0))}</button>
         <p class="op-note">${ic("sel")}Asked once. Change it any time in the Offline library.</p>${lib}`;
     } else {
       h = `<h4>Save ${esc(s.en)} for offline</h4><p>${ST.listen ? "Reads and plays" : "Reads"} with no internet.</p>
-        <div class="op-line">${ic("check")}<span><b>${ST.listen ? "Read and listen" : "Read only"}</b><small>${ST.listen ? esc(listenNames()) : "Arabic and your translation"}</small></span><em>${fmt(costOf(n))}</em></div>
+        <div class="op-line">${ic("check")}<span><b>${ST.listen ? "Read and listen" : "Read only"}</b><small>${ST.listen ? listenHtml() : "Arabic and your translation"}</small></span><em>${fmt(costOf(n))}</em></div>
         <button type="button" class="ob pri wide" data-oa="save" data-n="${n}">${ic("cloud")}Save · ${fmt(costOf(n))}</button>${lib}`;
     }
     if (!online() && st === "none") h += `<p class="op-note">${ic("nowifi")}You are offline. Saving starts when the connection returns.</p>`;
@@ -304,31 +308,31 @@ window.GQOff = (() => {
   function lisRow() {
     const vs = api.voices(), on = ST.listen, open = UI.lisOpen && on, total = nReady();
     const lack = needUpdate().filter(n => missing(n).voices.length), others = savedVoices().filter(id => !vs.some(v => v.id === id));
-    const head = `<div class="ol-row ol-lh"><button type="button" class="lis-t" data-oa="lisx" aria-expanded="${open}" aria-controls="lisBody" ${on ? "" : "disabled"}>${ic("ear", "i")}<span class="t"><b>Listen</b><small>${on ? "Saves " + esc(listenNames()) : "Off: surahs read offline only"}</small></span>${on ? ic("chev", "chv") : ""}</button><button type="button" class="sw ${on ? "on" : ""}" role="switch" aria-checked="${on}" aria-label="Listen offline" data-oa="lsw"></button></div>`;
+    const head = `<div class="ol-row ol-lh"><button type="button" class="lis-t" data-oa="lisx" aria-expanded="${open}" aria-controls="lisBody" ${on ? "" : "disabled"}>${ic("ear", "i")}<span class="t"><b>Listen</b><small>${on ? "Saves" + api.voices().map(v => `<span class="vl">${vh(v.name, v.native)}</span>`).join("") : "Off: surahs read offline only"}</small></span>${on ? ic("chev", "chv") : ""}</button><button type="button" class="sw ${on ? "on" : ""}" role="switch" aria-checked="${on}" aria-label="Listen offline" data-oa="lsw"></button></div>`;
     if (!open) return `<div class="ol-lis">${head}</div>`;
-    const rows = vs.map(v => { const c = voiceCount(v.id), fresh = total && !c; return `<div class="lv"><span class="t"><b>${esc(v.name)}${fresh ? `<span class="tag">New</span>` : ""}</b><small>${v.role === "tr" ? "Translation voice" : "Quran recitation"}</small></span><em class="${total && c < total ? "part" : ""}">${total ? c + " of " + total : ""}</em></div>`; }).join("");
-    const oth = others.map(id => `<div class="lv old"><span class="t"><b>${esc(api.voiceName(id))}</b><small>Still saved · ${voiceCount(id)} surah${voiceCount(id) === 1 ? "" : "s"} · ${fmt(voiceOnDevice(id))}</small></span><button type="button" class="ob sm dng" data-oa="vrm" data-k="${esc(id)}">Remove</button></div>`).join("");
+    const rows = vs.map(v => { const c = voiceCount(v.id), fresh = total && !c; return `<div class="lv"><span class="t"><b>${vh(v.name, v.native)}${fresh ? `<span class="tag">New</span>` : ""}</b><small>${v.role === "tr" ? "Translation voice" : "Quran recitation"}</small></span><em class="${total && c < total ? "part" : ""}">${total ? c + " of " + total : ""}</em></div>`; }).join("");
+    const oth = others.map(id => `<div class="lv old"><span class="t"><b>${vh(api.voiceName(id), api.voiceNative(id))}</b><small>Still saved · ${voiceCount(id)} surah${voiceCount(id) === 1 ? "" : "s"} · ${fmt(voiceOnDevice(id))}</small></span><button type="button" class="ob sm dng" data-oa="vrm" data-k="${esc(id)}">Remove</button></div>`).join("");
     return `<div class="ol-lis open">${head}<div class="lis-b" id="lisBody"><p class="lis-n">Saved surahs include the voices you have chosen now. To save others, change your voices, then add them.</p>${rows}
       ${lack.length ? `<button type="button" class="ob pri wide" data-oa="updall">${ic("cloud")}Add to ${lack.length} surah${lack.length > 1 ? "s" : ""} · ${fmt(costList(lack))}</button>` : ""}
       <button type="button" class="ob wide" data-oa="vopen">${ic("swap")}Change voices</button>${oth ? `<h5>Also on this device</h5>${oth}` : ""}</div></div>`;
   }
   /* the "Change voices" sheet: the player's own two lists. The Quran list is long, so it has search, and what you chose and what is already saved come first. */
   function vsList() {
-    const L = api.voiceLists(), saved = new Set(savedVoices()), q = VS.q.trim().toLowerCase(), hit = nm => !q || nm.toLowerCase().includes(q);
-    const row = (kind, id, name, cur, sub) => `<button type="button" class="vo ${cur ? "on" : ""}" role="radio" aria-checked="${cur}" tabindex="${cur ? 0 : -1}" data-oa="vpick" data-t="${kind}" data-k="${esc(id)}"><i class="rd"></i><span><b>${esc(name)}</b>${sub || saved.has(id) ? `<small>${esc(sub || "Saved on this device")}</small>` : ""}</span></button>`;
-    const head = t => `<h6>${esc(t)}</h6>`; let h = "", n = 0;
+    const L = api.voiceLists(), saved = new Set(savedVoices()), q = VS.q.trim().toLowerCase(), hit = nm => !q || nm.toLowerCase().includes(q);   // a search matches the English name and the own-language name
+    const row = (kind, id, name, cur, sub, native) => `<button type="button" class="vo ${cur ? "on" : ""}" role="radio" aria-checked="${cur}" tabindex="${cur ? 0 : -1}" data-oa="vpick" data-t="${kind}" data-k="${esc(id)}"><i class="rd"></i><span><b>${esc(name)}</b>${nat(native)}${sub || saved.has(id) ? `<small>${esc(sub || "Saved on this device")}</small>` : ""}</span></button>`;
+    const head = (t, nv) => `<h6>${esc(t)}${nat(nv)}</h6>`; let h = "", n = 0;
     if (VS.tab === "quran") {
       const cur = L.quran.cur, items = L.quran.items, by = id => items.find(x => x.id === id);
       if (!q || hit("none translation only")) { h += row("q", "", "None (translation only)", cur === "", ""); n++; }
       const first = q ? [] : [cur, ...[...saved].filter(id => id !== cur)].filter(id => by(id));   // searching shows one plain list of matches
-      if (first.length) { h += head(q ? "Matches" : "Chosen and saved") + first.map(id => row("q", id, by(id).name, id === cur)).join(""); n += first.length; }
-      const rest = items.filter(x => !first.includes(x.id) && hit(x.name));
-      if (rest.length) { h += head(first.length ? "All reciters" : q ? "Matches" : "Reciters") + rest.map(x => row("q", x.id, x.name, false)).join(""); n += rest.length; }
+      if (first.length) { h += head(q ? "Matches" : "Chosen and saved") + first.map(id => row("q", id, by(id).name, id === cur, "", by(id).native)).join(""); n += first.length; }
+      const rest = items.filter(x => !first.includes(x.id) && hit(x.name + " " + x.native));
+      if (rest.length) { h += head(first.length ? "All reciters" : q ? "Matches" : "Reciters") + rest.map(x => row("q", x.id, x.name, false, "", x.native)).join(""); n += rest.length; }
     } else {
       const cur = L.tr.cur;
       if (hit("auto")) { h += row("t", "auto", "Auto", cur === "auto", L.tr.auto ? "Follows your translation language: " + L.tr.auto : "None for your translation language"); n++; }
       if (hit("none")) { h += row("t", "", "None", cur === "", ""); n++; }
-      L.tr.groups.slice().sort((a, b) => a.label.localeCompare(b.label)).forEach(g => { const it = g.items.filter(x => hit(x.name) || hit(g.label)); if (it.length) { h += head(g.label) + it.map(x => row("t", x.id, x.name, x.id === cur)).join(""); n += it.length; } });
+      L.tr.groups.slice().sort((a, b) => a.label.localeCompare(b.label)).forEach(g => { const it = g.items.filter(x => hit(x.name + " " + x.native) || hit(g.label + " " + g.native)); if (it.length) { h += head(g.label, g.native) + it.map(x => row("t", x.id, x.name, x.id === cur, "", x.native)).join(""); n += it.length; } });
     }
     return n ? h : `<p class="op-note">No voice matches "${esc(VS.q)}".</p>`;
   }
@@ -338,7 +342,7 @@ window.GQOff = (() => {
     list.innerHTML = vsList(); list.scrollTop = sc; if (!$(".vo.on", list)) { const x = $(".vo", list); x && (x.tabIndex = 0); }
     $$("#ovTabs [data-k]", m).forEach(b => { const on = b.dataset.k === VS.tab; b.setAttribute("aria-selected", on); b.tabIndex = on ? 0 : -1; });
     $("#ovQ").placeholder = VS.tab === "quran" ? "Search reciters" : "Search translation voices"; $("#ovQ").setAttribute("aria-label", $("#ovQ").placeholder);
-    const w = $("#ovNow"); w.innerHTML = `<b>Saved surahs get</b> ${esc(listenNames())}`;
+    const w = $("#ovNow"); w.innerHTML = `<b>Saved surahs get</b> ${listenHtml()}`;
     if (f && f.oa === "vpick") { const x = $$("#ovList [data-oa=vpick]").find(b => b.dataset.k === f.k && b.dataset.t === f.t); x && x.focus({ preventScroll: true }); }
   }
   function voiceSheet() {
@@ -406,7 +410,7 @@ window.GQOff = (() => {
     const rd = readMB(api.cur()), au = api.voices().reduce((a, v) => a + voiceMB(api.cur(), v), 0);
     mini(`<h4>Listen offline too?</h4><p>Saved surahs open with no internet. Do you also want the recitation?</p>
       <div class="op-opts"><button type="button" class="opt ${ST.listen ? "" : "on"}" data-oa="ls0"><i class="rd"></i><span><b>Read only</b><small>Arabic and your translation</small></span></button>
-      <button type="button" class="opt ${ST.listen ? "on" : ""}" data-oa="ls1"><i class="rd"></i><span><b>Read and listen<span class="tag">Suggested</span></b><small>Plus the recitation by ${esc(listenNames())}</small></span></button></div>
+      <button type="button" class="opt ${ST.listen ? "on" : ""}" data-oa="ls1"><i class="rd"></i><span><b>Read and listen<span class="tag">Suggested</span></b><small>Plus the recitation by ${listenHtml()}</small></span></button></div>
       <p class="op-note">${ic("sel")}Asked once. Change it any time in the Offline library.</p>
       <div class="om-btns"><button type="button" class="ob" data-oa="mclose">Not now</button><button type="button" class="ob pri" data-oa="asked">Continue</button></div>`, { ls0: () => { ST.listen = false; save(); askListen(then); }, ls1: () => { ST.listen = true; save(); askListen(then); }, asked: () => { ST.asked = true; save(); done(); then && then(); emit(); } });
   }
@@ -449,7 +453,7 @@ window.GQOff = (() => {
       case "vopen": voiceSheet(); return;
       case "vtab": VS.tab = k; VS.q = ""; $("#ovQ").value = ""; vsRender(); return;
       case "vpick": (t.dataset.t === "q" ? api.setReciter : api.setTrRec)(k); vsRender(); break;
-      case "vrm": { const id = k, c = voiceCount(id); mini(`<h4>Remove ${esc(api.voiceName(id))}?</h4><p>Its recitation is removed from ${c} surah${c === 1 ? "" : "s"} (${fmt(voiceOnDevice(id))}). They still read offline, and you can add it again any time.</p><div class="om-btns"><button type="button" class="ob" data-oa="mclose">Keep it</button><button type="button" class="ob dng" data-oa="vrmy">Remove</button></div>`, { vrmy: () => { done(); removeVoice(id).then(() => api.toast("Removed " + api.voiceName(id))); } }); return; }
+      case "vrm": { const id = k, c = voiceCount(id); mini(`<h4>Remove ${vh(api.voiceName(id), api.voiceNative(id))}?</h4><p>Its recitation is removed from ${c} surah${c === 1 ? "" : "s"} (${fmt(voiceOnDevice(id))}). They still read offline, and you can add it again any time.</p><div class="om-btns"><button type="button" class="ob" data-oa="mclose">Keep it</button><button type="button" class="ob dng" data-oa="vrmy">Remove</button></div>`, { vrmy: () => { done(); removeVoice(id).then(() => api.toast("Removed " + api.voiceName(id))); } }); return; }
       case "lsw": { ST.listen = !ST.listen; save(); const upd = needUpdate(); if (ST.listen && upd.length) { /* the banner offers the recitation */ } break; }
       case "auto": ST.auto = !ST.auto; save(); if (ST.auto) api.toast("New surahs you read will save on Wi-Fi"); break;
       case "save": ST.asked = true; save(); startList([n]); api.closePops(); break;

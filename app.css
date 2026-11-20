@@ -982,3 +982,9 @@ html.night .ol-card, html.night .om-card { background: #2e383a; color: #e9efee; 
 }
 .lis-b { margin-left: 0; grid-template-columns: minmax(0, 1fr); } .lis-b > * { min-width: 0; }
 .lis-b .ob { white-space: normal; text-align: center; line-height: 1.25; padding-top: 8px; padding-bottom: 8px; }
+/* voice names: the English name, then the voice's own-language name in its own script */
+.nat { margin-left: 8px; font: 500 1em/1.35 var(--ui); color: var(--tr-ink); unicode-bidi: isolate; }
+.vo .nat { display: block; margin: 1px 0 0; text-align: left; font-size: 14.5px; }
+.lis-t .t small .vl { display: block; } .lis-t .t small .vl .nat { display: inline; }
+.vs-list h6 .nat, .vs-foot .nat { text-transform: none; letter-spacing: 0; font-weight: 600; }
+.lv b .nat { font-weight: 500; }

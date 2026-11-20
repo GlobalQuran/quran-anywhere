@@ -642,6 +642,8 @@
   let RECITERS = [["ar.alafasy", "Mishary Alafasy", "Alafasy"]], TR_REC = [];   // [id, name, short] and [id, lang, name, -, short]; filled from /v2/list/recitor
   const REC_MEDIA = {};
   const voiceName = id => { const q = RECITERS.find(r => r[0] === id), r = TR_REC.find(x => x[0] === id); return q ? q[1] : r ? `${r[2]} (${r[1].toUpperCase()})` : id; };   // always Latin letters (the API short name for a translation voice is in its own script)
+  const voiceNative = id => { const q = RECITERS.find(r => r[0] === id), r = TR_REC.find(x => x[0] === id), en = voiceName(id), nat = q ? q[2] : r ? r[4] : ""; return nat && nat.toLowerCase() !== en.toLowerCase().replace(/ \([a-z]{2,3}\)$/, "") && nat !== en ? nat : ""; };   // the voice's name in its own language and script, when it differs from the English one
+  const voiceLabel = (en, nat) => nat && nat.toLowerCase() !== en.toLowerCase() ? `${en} · ${nat}` : en;
   function setVoices(list) {
     const by = (x, y) => (x.id === "ar.alafasy" ? -1 : y.id === "ar.alafasy" ? 1 : x.full.localeCompare(y.full));
     RECITERS = list.filter(r => r.lang === "ar").sort(by).map(r => [r.id, r.full, r.name]);
@@ -805,9 +807,9 @@
   function setSpeed(v) { if (+v !== A.speed) stat("setting_change", { setting: "speed", value: String(v) }); A.speed = +v; if (typeof syncVoiceBtn === "function") syncVoiceBtn(); store.set("speed", v); audio.playbackRate = A.speed; $$("#plSpeedSeg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.v === String(v))); $("#optSpeed").value = v; }
   const trAutoLabel = () => { const r = TR_REC.find(x => x[0] === (A.trRec === "auto" ? trRecId() : "")); return r ? `Auto: ${r[2]}` : "Auto (none for this language)"; };
   function buildReciters() {
-    const ar = `<option value="">None (translation only)</option>` + RECITERS.map(([id, nm]) => `<option value="${id}">${esc(nm)}</option>`).join("");
+    const ar = `<option value="">None (translation only)</option>` + RECITERS.map(([id, nm, nat]) => `<option value="${id}">${esc(voiceLabel(nm, nat))}</option>`).join("");
     const langs = [...new Set(TR_REC.map(r => r[1]))];
-    const tr = `<option value="auto">${esc(trAutoLabel())}</option><option value="">None</option>` + langs.map(l => `<optgroup label="${esc(langNames(l).nat)}">` + TR_REC.filter(r => r[1] === l).map(r => `<option value="${r[0]}">${esc(r[2])}</option>`).join("") + `</optgroup>`).join("");
+    const tr = `<option value="auto">${esc(trAutoLabel())}</option><option value="">None</option>` + langs.map(l => `<optgroup label="${esc(langNames(l).nat)}">` + TR_REC.filter(r => r[1] === l).map(r => `<option value="${r[0]}">${esc(voiceLabel(r[2], r[4]))}</option>`).join("") + `</optgroup>`).join("");
     [$("#plReciter"), $("#optReciter")].forEach(s => { s.innerHTML = ar; }); [$("#plTrRec"), $("#optTrRec")].forEach(s => { s.innerHTML = tr; });
     syncReciters(false);
   }
@@ -1640,13 +1642,13 @@
       textIds: () => [...new Set(["quran-uthmani", "quran-tajweed", ...S.trs, ...(S.rdTr ? [S.rdTr] : []), ...(TL.on && TL.id ? [TL.id] : [])])],   // every edition the page can draw
       voices: () => {   // the voices the player would use: the Quran reciter, the translation voice, or the default reciter when both are off
         const ids = []; if (A.reciter) ids.push(A.reciter); const t = trRecId(); if (t && !ids.includes(t)) ids.push(t); if (!ids.length) ids.push("ar.alafasy");
-        return ids.map(id => { const v = audioVariants(id)[0] || audioVariant(id); return { id, kbs: v.kbs, name: voiceName(id), role: RECITERS.some(r => r[0] === id) ? "quran" : "tr" }; });
+        return ids.map(id => { const v = audioVariants(id)[0] || audioVariant(id); return { id, kbs: v.kbs, name: voiceName(id), native: voiceNative(id), role: RECITERS.some(r => r[0] === id) ? "quran" : "tr" }; });
       },
-      voiceName,
-      /* what the "Change voices" sheet offers: the same lists as the player's two menus (never a native-script name, so every name reads in English letters) */
+      voiceName, voiceNative,
+      /* what the "Change voices" sheet offers: the same lists as the player's two menus. Every voice has its English name and, when different, its own-language name (read in its own script). */
       voiceLists: () => ({
-        quran: { cur: A.reciter, items: RECITERS.map(r => ({ id: r[0], name: r[1] })) },
-        tr: { cur: A.trRec, auto: trRecId() ? voiceName(trRecId()) : "", groups: [...new Set(TR_REC.map(r => r[1]))].map(l => ({ lang: l, label: langNames(l).en || langNames(l).nat, items: TR_REC.filter(r => r[1] === l).map(r => ({ id: r[0], name: r[2] })) })) }
+        quran: { cur: A.reciter, items: RECITERS.map(r => ({ id: r[0], name: r[1], native: voiceNative(r[0]) })) },
+        tr: { cur: A.trRec, auto: trRecId() ? voiceName(trRecId()) : "", groups: [...new Set(TR_REC.map(r => r[1]))].map(l => ({ lang: l, label: langNames(l).en || langNames(l).nat, native: langNames(l).nat.toLowerCase() !== (langNames(l).en || "").toLowerCase() ? langNames(l).nat : "", items: TR_REC.filter(r => r[1] === l).map(r => ({ id: r[0], name: r[2], native: voiceNative(r[0]) })) })) }
       }),
       setReciter, setTrRec,
       audioUrl: (id, g) => audioFile(id, g, 0), marks: () => bms.map(k => +String(k).split(":")[0])
