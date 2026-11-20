@@ -126,8 +126,9 @@
   let KEYHIDE = store.get("keyhide") === "1";   // the small x on the key strip hides it; toggling tajweed off/on is the only way back
   /* tajweed colours are drawn on letter ranges; they land correctly in the mushaf colour font, Amiri Quran and KFC Naskh, but not in Me Quran
      (marks and joined letters pick up the wrong colours). On an unsupported font tajweed switches itself off and returns when the font does. */
-  /* the mushaf tajweed colours live inside the colour (COLRv1) page fonts: Chrome / Edge / Firefox 117+ draw them, Safari does not (it would show plain black glyphs while saying "On") */
-  const COLR = (() => { try { return CSS.supports("font-tech(color-COLRv1)"); } catch (e) { return false; } })();
+  /* the mushaf tajweed colours live inside the colour page fonts (v4-p*.woff2). They are COLR **version 0** (checked with fontTools; not v1), which Chrome, Edge, Firefox and Safari / iOS web views all draw
+     (tested in iOS 27 Safari, day and night). Do NOT gate them with tech(color-COLRv1) or CSS.supports("font-tech(color-COLRv1)"): Safari does not claim v1 and would skip fonts it can draw. COLR stays as a flag for offline.js. */
+  const COLR = true;
   const TJ_FONTS = ["mushaf", "amiri", "kfc"], tjOk = f => f === "mushaf" ? COLR : TJ_FONTS.includes(f);
   let FONT = ["mushaf", "amiri", "kfc", "me"].includes(fontPref) ? fontPref : "mushaf";
   const TJ = { want: store.get("tajweed") !== "0", on: store.get("tajweed") !== "0" && tjOk(FONT), data: [],   // tajweed is on by default
@@ -194,7 +195,7 @@
   function useFonts(pages) {
     let css = ""; for (const p of pages) { if (QC.pages.has(p)) continue; QC.pages.add(p);
       css += `@font-face{font-family:QCF2P${p};src:url(${ASSETS}/fonts/qcf/v2-p${p}.woff2) format("woff2");font-display:block}` +
-             `@font-face{font-family:QCF4P${p};src:url(${ASSETS}/fonts/qcf/v4-p${p}.woff2) format("woff2") tech(color-COLRv1);font-display:block}` +
+             `@font-face{font-family:QCF4P${p};src:url(${ASSETS}/fonts/qcf/v4-p${p}.woff2) format("woff2");font-display:block}` +
              `.qcf .g.p${p}{font-family:QCF2P${p}}html.tj-on .qcf .g.p${p}{font-family:QCF4P${p},QCF2P${p}}`; }
     if (css) qStyle.appendChild(document.createTextNode(css));
   }
@@ -203,7 +204,7 @@
     const key = (TJ.on ? 4 : 2) + ":" + p;
     if (!FR.has(key)) FR.set(key, (async () => {
       const r = await document.fonts.load("32px " + (TJ.on ? "QCF4P" : "QCF2P") + p).catch(() => []);
-      if (!r.length && TJ.on) await document.fonts.load("32px QCF2P" + p).catch(() => {});   // no COLRv1 (Safari): mono font
+      if (!r.length && TJ.on) await document.fonts.load("32px QCF2P" + p).catch(() => {});   // colour font failed to load: mono font
     })());
     return FR.get(key);
   }
