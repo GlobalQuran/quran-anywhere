@@ -53,6 +53,9 @@ window.GQOff = (() => {
   const readOnDevice = () => Object.values(ST.s).reduce((a, r) => a + (r.rb || 0), 0);
   const nReady = () => Object.keys(ST.s).filter(n => ST.s[n].r).length;
   const nListen = () => Object.keys(ST.s).filter(n => ST.s[n].r && Object.keys(ST.s[n].a || {}).length).length;
+  const savedVoices = () => [...new Set(Object.values(ST.s).flatMap(r => Object.keys(r.a || {})))];   // every voice that has files on this device
+  const voiceCount = id => Object.keys(ST.s).filter(n => ST.s[n].r && ST.s[n].a && ST.s[n].a[id]).length;
+  const voiceOnDevice = id => Object.values(ST.s).reduce((a, r) => a + ((r.a || {})[id] || 0), 0);
   const touched = n => (ST.seen || []).includes(n) || api.marks().includes(n);   // opened, played or saved
   const needUpdate = () => Object.keys(ST.s).map(Number).filter(n => ST.s[n].r && !isComplete(n) && !Q.list.includes(n));
   const allN = () => Array.from({ length: 114 }, (_, i) => i + 1);
@@ -60,7 +63,8 @@ window.GQOff = (() => {
   /* ---------- the download queue ---------- */
   const Q = { list: [], run: false, prog: {}, cost: {}, batch: null, err: null, busy: false, ctl: new Set() };
   const SEL = new Set();   // surahs ticked in the library or in the list
-  let UI = { filter: "all", selMode: false, listFilter: "all", pop: null };
+  let UI = { filter: "all", selMode: false, listFilter: "all", pop: null, lisOpen: false };
+  const VS = { tab: "quran", q: "", open: false };   // the "Change voices" sheet
 
   async function open() { if (!cache) cache = await caches.open(BUCKET); return cache; }
   async function persist() { try { if (navigator.storage && navigator.storage.persist) await navigator.storage.persist(); } catch (e) {} }
@@ -177,6 +181,10 @@ window.GQOff = (() => {
     await purge(u => { const f = fontRe.exec(u); if (f) return mine.has(+f[1]); const g = glyphRe.exec(u); return !!g && +g[1] === n && n !== 1; });
     delete ST.s[n]; save(); refreshFree(); emit();
   }
+  async function removeVoice(id) {   // one voice's recitation from every surah; the reading part stays
+    await purge(u => { const m = audioRe.exec(u); return !!m && m[1] === id; });
+    Object.values(ST.s).forEach(r => { if (r.a) delete r.a[id]; }); save(); refreshFree(); emit();
+  }
   async function removeAll() { cancel(); await caches.delete(BUCKET); cache = null; ST.s = {}; save(); refreshFree(); emit(); }
 
   /* ---------- small helpers for the pieces ---------- */
@@ -186,6 +194,7 @@ window.GQOff = (() => {
     trash: `<path d="M4 7h16M9 7V4.5h6V7M6.5 7l1 13h9l1-13M10 11v6M14 11v6"/>`, ear: `<path d="M4 14v-2a8 8 0 0 1 16 0v2M4 14a2 2 0 0 0 2 2h1v-5H6a2 2 0 0 0-2 2zM20 14a2 2 0 0 1-2 2h-1v-5h1a2 2 0 0 1 2 2z"/>`,
     text: `<path d="M4 18 9.5 5l5.5 13M6 14h7M16.5 9h4M18.5 9v9"/>`, wifi: `<path d="M2.5 9a15 15 0 0 1 19 0M5.7 12.4a10 10 0 0 1 12.6 0M9 15.7a5 5 0 0 1 6 0M12 19.2h.01"/>`,
     nowifi: `<path d="M2.5 9a15 15 0 0 1 19 0M5.7 12.4a10 10 0 0 1 12.6 0M9 15.7a5 5 0 0 1 6 0M12 19.2h.01M4 4l16 16"/>`, alert: `<path d="M12 4 3 19h18zM12 10v4M12 16.8h.01"/>`,
+    chev: `<path d="M6 9.5l6 6 6-6"/>`, swap: `<path d="M7 4 3.5 7.5 7 11M3.5 7.5h13M17 13l3.5 3.5L17 20M20.5 16.5h-13"/>`,
     sel: `<rect x="4" y="4" width="16" height="16" rx="4"/><path d="M8.5 12.5l2.4 2.4 4.6-5"/>`
   };
   const ic = (n, c = "") => `<svg class="${c}" viewBox="0 0 24 24" aria-hidden="true">${ICON[n]}</svg>`;
@@ -290,6 +299,57 @@ window.GQOff = (() => {
       : st === "wait" ? `<svg viewBox="0 0 42 42" aria-hidden="true"><circle class="t" cx="21" cy="21" r="19" stroke-dasharray="3 4.4"/></svg>` : st === "ready" ? `<svg viewBox="0 0 42 42" aria-hidden="true"><circle class="f" cx="21" cy="21" r="21"/></svg>` : `<svg viewBox="0 0 42 42" aria-hidden="true"><circle class="t" cx="21" cy="21" r="19"/></svg>`;
     return `<button type="button" class="lt ${st} ${SEL.has(n) ? "sel" : ""}" data-oa="${st === "ready" ? "menu" : st === "none" ? "tick" : "tq"}" data-n="${n}" aria-pressed="${SEL.has(n)}" aria-label="${esc(surahName(n))}, ${st === "ready" ? "ready offline" : st === "busy" ? "saving" : st === "wait" ? "waiting" : "not saved"}"><span class="lt-t">${ic("check")}</span><span class="lt-r">${svg}<b>${n}</b></span><span class="lt-n">${esc(surahName(n))}</span><span class="lt-z">${st === "ready" ? fmt(sizeOf(n)) : fmt(costOf(n))}${mis ? " ·" : ""}</span></button>`;
   }
+  const lackNames = list => { const ids = new Set(); list.forEach(n => missing(n).voices.forEach(v => ids.add(v.id))); return ids.size ? api.voices().filter(v => ids.has(v.id)).map(v => v.name).join(" + ") : "listening"; };
+  /* the Listen row: collapsed it names the voices that get saved; open it shows each voice, how many saved surahs have it, and the way to change them */
+  function lisRow() {
+    const vs = api.voices(), on = ST.listen, open = UI.lisOpen && on, total = nReady();
+    const lack = needUpdate().filter(n => missing(n).voices.length), others = savedVoices().filter(id => !vs.some(v => v.id === id));
+    const head = `<div class="ol-row ol-lh"><button type="button" class="lis-t" data-oa="lisx" aria-expanded="${open}" aria-controls="lisBody" ${on ? "" : "disabled"}>${ic("ear", "i")}<span class="t"><b>Listen</b><small>${on ? "Saves " + esc(listenNames()) : "Off: surahs read offline only"}</small></span>${on ? ic("chev", "chv") : ""}</button><button type="button" class="sw ${on ? "on" : ""}" role="switch" aria-checked="${on}" aria-label="Listen offline" data-oa="lsw"></button></div>`;
+    if (!open) return `<div class="ol-lis">${head}</div>`;
+    const rows = vs.map(v => { const c = voiceCount(v.id), fresh = total && !c; return `<div class="lv"><span class="t"><b>${esc(v.name)}${fresh ? `<span class="tag">New</span>` : ""}</b><small>${v.role === "tr" ? "Translation voice" : "Quran recitation"}</small></span><em class="${total && c < total ? "part" : ""}">${total ? c + " of " + total : ""}</em></div>`; }).join("");
+    const oth = others.map(id => `<div class="lv old"><span class="t"><b>${esc(api.voiceName(id))}</b><small>Still saved · ${voiceCount(id)} surah${voiceCount(id) === 1 ? "" : "s"} · ${fmt(voiceOnDevice(id))}</small></span><button type="button" class="ob sm dng" data-oa="vrm" data-k="${esc(id)}">Remove</button></div>`).join("");
+    return `<div class="ol-lis open">${head}<div class="lis-b" id="lisBody"><p class="lis-n">Saved surahs include the voices you have chosen now. To save others, change your voices, then add them.</p>${rows}
+      ${lack.length ? `<button type="button" class="ob pri wide" data-oa="updall">${ic("cloud")}Add to ${lack.length} surah${lack.length > 1 ? "s" : ""} · ${fmt(costList(lack))}</button>` : ""}
+      <button type="button" class="ob wide" data-oa="vopen">${ic("swap")}Change voices</button>${oth ? `<h5>Also on this device</h5>${oth}` : ""}</div></div>`;
+  }
+  /* the "Change voices" sheet: the player's own two lists. The Quran list is long, so it has search, and what you chose and what is already saved come first. */
+  function vsList() {
+    const L = api.voiceLists(), saved = new Set(savedVoices()), q = VS.q.trim().toLowerCase(), hit = nm => !q || nm.toLowerCase().includes(q);
+    const row = (kind, id, name, cur, sub) => `<button type="button" class="vo ${cur ? "on" : ""}" role="radio" aria-checked="${cur}" tabindex="${cur ? 0 : -1}" data-oa="vpick" data-t="${kind}" data-k="${esc(id)}"><i class="rd"></i><span><b>${esc(name)}</b>${sub || saved.has(id) ? `<small>${esc(sub || "Saved on this device")}</small>` : ""}</span></button>`;
+    const head = t => `<h6>${esc(t)}</h6>`; let h = "", n = 0;
+    if (VS.tab === "quran") {
+      const cur = L.quran.cur, items = L.quran.items, by = id => items.find(x => x.id === id);
+      if (!q || hit("none translation only")) { h += row("q", "", "None (translation only)", cur === "", ""); n++; }
+      const first = q ? [] : [cur, ...[...saved].filter(id => id !== cur)].filter(id => by(id));   // searching shows one plain list of matches
+      if (first.length) { h += head(q ? "Matches" : "Chosen and saved") + first.map(id => row("q", id, by(id).name, id === cur)).join(""); n += first.length; }
+      const rest = items.filter(x => !first.includes(x.id) && hit(x.name));
+      if (rest.length) { h += head(first.length ? "All reciters" : q ? "Matches" : "Reciters") + rest.map(x => row("q", x.id, x.name, false)).join(""); n += rest.length; }
+    } else {
+      const cur = L.tr.cur;
+      if (hit("auto")) { h += row("t", "auto", "Auto", cur === "auto", L.tr.auto ? "Follows your translation language: " + L.tr.auto : "None for your translation language"); n++; }
+      if (hit("none")) { h += row("t", "", "None", cur === "", ""); n++; }
+      L.tr.groups.slice().sort((a, b) => a.label.localeCompare(b.label)).forEach(g => { const it = g.items.filter(x => hit(x.name) || hit(g.label)); if (it.length) { h += head(g.label) + it.map(x => row("t", x.id, x.name, x.id === cur)).join(""); n += it.length; } });
+    }
+    return n ? h : `<p class="op-note">No voice matches "${esc(VS.q)}".</p>`;
+  }
+  function vsRender() {
+    const m = $("#offmini"), list = $("#ovList"); if (!m || !list || !VS.open) return;
+    const f = document.activeElement && m.contains(document.activeElement) ? document.activeElement.dataset : null, sc = list.scrollTop;
+    list.innerHTML = vsList(); list.scrollTop = sc; if (!$(".vo.on", list)) { const x = $(".vo", list); x && (x.tabIndex = 0); }
+    $$("#ovTabs [data-k]", m).forEach(b => { const on = b.dataset.k === VS.tab; b.setAttribute("aria-selected", on); b.tabIndex = on ? 0 : -1; });
+    $("#ovQ").placeholder = VS.tab === "quran" ? "Search reciters" : "Search translation voices"; $("#ovQ").setAttribute("aria-label", $("#ovQ").placeholder);
+    const w = $("#ovNow"); w.innerHTML = `<b>Saved surahs get</b> ${esc(listenNames())}`;
+    if (f && f.oa === "vpick") { const x = $$("#ovList [data-oa=vpick]").find(b => b.dataset.k === f.k && b.dataset.t === f.t); x && x.focus({ preventScroll: true }); }
+  }
+  function voiceSheet() {
+    VS.open = true; VS.q = "";
+    mini(`<div class="vs-h"><h4>Change voices</h4></div><p>These are the player's own voices, so the reader changes too. Pick what you want saved.</p>
+      <div class="vs-tabs" id="ovTabs" role="tablist"><button type="button" role="tab" data-oa="vtab" data-k="quran">Quran recitation</button><button type="button" role="tab" data-oa="vtab" data-k="tr">Translation voice</button></div>
+      <input id="ovQ" class="vs-q" type="search" autocomplete="off" spellcheck="false">
+      <div class="vs-list" id="ovList" role="radiogroup" aria-label="Voices"></div>
+      <div class="vs-foot"><span id="ovNow"></span><button type="button" class="ob pri" data-oa="mclose">Done</button></div>`);
+    $("#offmini").classList.add("sheet"); vsRender(); const t = $("#ovTabs [aria-selected=true]"); t && t.focus({ preventScroll: true });
+  }
   function renderLib() {
     const el = lib(); if (!el || el.hidden) return;
     const pend = [...SEL].filter(n => !isComplete(n) && !Q.list.includes(n)).sort((a, b) => a - b), cost = costList(pend), bs = batchStats(), upd = needUpdate();
@@ -300,13 +360,13 @@ window.GQOff = (() => {
       <div class="stack"><i class="a" style="width:${Math.min(100, readOnDevice() / Math.max(onDevice(), .01) * 100)}%"></i></div>
       <div class="key"><span><i class="a"></i>Reading ${fmt(readOnDevice())}</span><span><i class="b"></i>Listening ${fmt(onDevice() - readOnDevice())}</span></div>
       <small>${nReady()} of 114 surahs ready · ${nListen()} with listening${FREE != null ? " · " + fmt(FREE) + " free" : ""}</small></div>
-      ${upd.length ? `<div class="ol-ban">${ic("ear")}<span><b>${upd.length} ready surah${upd.length > 1 ? "s" : ""} ${upd.every(n => !missing(n).text.length && !missing(n).read) ? (upd.length > 1 ? "have" : "has") + " no listening yet" : (upd.length > 1 ? "need" : "needs") + " an update"}</b><small>${upd.every(n => !missing(n).text.length) ? "Add the recitation" : "Add what is missing"} · ${fmt(costList(upd))}</small></span><button type="button" class="ob" data-oa="updall">Add</button></div>` : ""}
+      ${upd.length && !(UI.lisOpen && ST.listen && upd.every(n => !missing(n).text.length && !missing(n).read)) ? `<div class="ol-ban">${ic("ear")}<span><b>${upd.length} ready surah${upd.length > 1 ? "s" : ""} ${upd.every(n => !missing(n).text.length && !missing(n).read) ? (upd.length > 1 ? "have" : "has") + " no " + esc(lackNames(upd)) + " yet" : (upd.length > 1 ? "need" : "needs") + " an update"}</b><small>${upd.every(n => !missing(n).text.length) ? "Add the recitation" : "Add what is missing"} · ${fmt(costList(upd))}</small></span><button type="button" class="ob" data-oa="updall">Add</button></div>` : ""}
       <h3>Quick picks</h3>
       <div class="ol-picks"><button type="button" class="pk ${eq(allNeed) ? "on" : ""}" data-oa="pick" data-k="all" ${allNeed.length ? "" : "disabled"}><span><b>Whole Quran</b><small>${allNeed.length ? allNeed.length + " surah" + (allNeed.length > 1 ? "s" : "") + " to save" : "All ready"}</small></span><em>${allNeed.length ? fmt(costList(allNeed)) : ""}</em></button>
       <button type="button" class="pk ${eq(readNeed) ? "on" : ""}" data-oa="pick" data-k="read" ${readNeed.length ? "" : "disabled"}><span><b>The ones I read</b><small>${readNeed.length ? readNeed.length + " you opened, played or saved" : "Nothing new yet"}</small></span><em>${readNeed.length ? fmt(costList(readNeed)) : ""}</em></button></div>
       <h3>What to keep</h3>
       <div class="ol-row ol-read">${ic("text", "i")}<span class="t"><b>Read</b><small>Arabic, your translation, page fonts</small></span><i class="sw lock" aria-hidden="true"></i></div>
-      <div class="ol-row">${ic("ear", "i")}<span class="t"><b>Listen</b><small>${lis.length ? "Recitation by " + esc(listenNames()) : "Off: surahs read offline only"}${ST.listen ? "" : ""}</small></span><button type="button" class="sw ${ST.listen ? "on" : ""}" role="switch" aria-checked="${ST.listen}" aria-label="Listen offline" data-oa="lsw"></button></div>
+      ${lisRow()}
       <h3>Automatic</h3>
       <div class="ol-row">${ic("wifi", "i")}<span class="t"><b>Keep what I read ready</b><small>New surahs you open or play save themselves on Wi-Fi</small></span><button type="button" class="sw ${ST.auto ? "on" : ""}" role="switch" aria-checked="${ST.auto}" aria-label="Keep what I read ready" data-oa="auto"></button></div>
       <p class="op-note">${ic("wifi")}Wi-Fi is best for big downloads. It pauses by itself if the connection drops and carries on where it stopped.</p>
@@ -334,14 +394,14 @@ window.GQOff = (() => {
   function closeLib() { if (!libOpen()) return; closeMini(); lib().hidden = true; if (libFrom && libFrom.focus && document.contains(libFrom)) libFrom.focus({ preventScroll: true }); libFrom = null; }
 
   /* ---------- small dialogs: the one-time question, a saved surah's options, big downloads, no space ---------- */
-  function closeMini() { const m = $("#offmini"); if (m) { m.hidden = true; m.innerHTML = ""; } }
+  function closeMini() { const m = $("#offmini"); if (m) { m.hidden = true; m.innerHTML = ""; m.classList.remove("sheet"); } VS.open = false; }
   const miniOpen = () => { const m = $("#offmini"); return !!m && !m.hidden; };
   let miniFrom = null;
   function mini(html, acts) {
     const m = $("#offmini"); miniFrom = document.activeElement; m.hidden = false; m._acts = acts || {};
     m.innerHTML = `<div class="om-card" role="document">${html}</div>`; const f = $(".ob.pri, .ob", m); f && f.focus({ preventScroll: true });
   }
-  function done() { closeMini(); if (miniFrom && miniFrom.focus && document.contains(miniFrom)) miniFrom.focus({ preventScroll: true }); miniFrom = null; }
+  function done() { const wasV = VS.open; VS.open = false; closeMini(); if (wasV) { const b = $("#offlib [data-oa=vopen]"); if (b) { b.focus({ preventScroll: true }); miniFrom = null; return; } } if (miniFrom && miniFrom.focus && document.contains(miniFrom)) miniFrom.focus({ preventScroll: true }); miniFrom = null; }
   function askListen(then) {
     const rd = readMB(api.cur()), au = api.voices().reduce((a, v) => a + voiceMB(api.cur(), v), 0);
     mini(`<h4>Listen offline too?</h4><p>Saved surahs open with no internet. Do you also want the recitation?</p>
@@ -385,6 +445,11 @@ window.GQOff = (() => {
     switch (a) {
       case "lib": openLib(); break; case "libx": closeLib(); break; case "mclose": done(); break;
       case "ls0": case "ls1": ST.listen = a === "ls1"; save(); break;
+      case "lisx": UI.lisOpen = !UI.lisOpen; break;
+      case "vopen": voiceSheet(); return;
+      case "vtab": VS.tab = k; VS.q = ""; $("#ovQ").value = ""; vsRender(); return;
+      case "vpick": (t.dataset.t === "q" ? api.setReciter : api.setTrRec)(k); vsRender(); break;
+      case "vrm": { const id = k, c = voiceCount(id); mini(`<h4>Remove ${esc(api.voiceName(id))}?</h4><p>Its recitation is removed from ${c} surah${c === 1 ? "" : "s"} (${fmt(voiceOnDevice(id))}). They still read offline, and you can add it again any time.</p><div class="om-btns"><button type="button" class="ob" data-oa="mclose">Keep it</button><button type="button" class="ob dng" data-oa="vrmy">Remove</button></div>`, { vrmy: () => { done(); removeVoice(id).then(() => api.toast("Removed " + api.voiceName(id))); } }); return; }
       case "lsw": { ST.listen = !ST.listen; save(); const upd = needUpdate(); if (ST.listen && upd.length) { /* the banner offers the recitation */ } break; }
       case "auto": ST.auto = !ST.auto; save(); if (ST.auto) api.toast("New surahs you read will save on Wi-Fi"); break;
       case "save": ST.asked = true; save(); startList([n]); api.closePops(); break;
@@ -414,8 +479,16 @@ window.GQOff = (() => {
   document.addEventListener("keydown", e => {
     if (!libOpen() && !miniOpen()) return;
     if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); miniOpen() ? done() : closeLib(); }
+    else if (VS.open && (e.key === "ArrowDown" || e.key === "ArrowUp")) {   // arrow keys walk the voice list (search box -> list -> back)
+      const all = $$("#ovList .vo"), i = all.indexOf(document.activeElement), inQ = document.activeElement && document.activeElement.id === "ovQ";
+      if (i < 0 && !inQ) return; e.preventDefault();
+      const j = inQ ? (e.key === "ArrowDown" ? 0 : -1) : i + (e.key === "ArrowDown" ? 1 : -1);
+      if (j < 0) return $("#ovQ").focus(); const x = all[Math.min(j, all.length - 1)]; if (x) { all.forEach(b => { b.tabIndex = -1; }); x.tabIndex = 0; x.focus(); }
+    }
     else if (e.key === "Tab") { const box = miniOpen() ? $("#offmini") : lib(), f = $$("button, [href], input, [tabindex]:not([tabindex='-1'])", box).filter(x => !x.disabled && x.offsetParent !== null); if (!f.length) return; const a = f[0], z = f[f.length - 1]; if (e.shiftKey && document.activeElement === a) { e.preventDefault(); z.focus(); } else if (!e.shiftKey && document.activeElement === z) { e.preventDefault(); a.focus(); } }
   }, true);
+
+  document.addEventListener("input", e => { if (e.target.id === "ovQ" && VS.open) { VS.q = e.target.value; vsRender(); } });
 
   /* ---------- drawing, once per frame at most ---------- */
   let raf = 0, tmr = 0, full = false, last = 0;

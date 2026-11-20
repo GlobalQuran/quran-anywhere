@@ -641,6 +641,7 @@
      chosen translation's language). Neither chosen = the default Quran reciter, so something always plays. */
   let RECITERS = [["ar.alafasy", "Mishary Alafasy", "Alafasy"]], TR_REC = [];   // [id, name, short] and [id, lang, name, -, short]; filled from /v2/list/recitor
   const REC_MEDIA = {};
+  const voiceName = id => { const q = RECITERS.find(r => r[0] === id), r = TR_REC.find(x => x[0] === id); return q ? q[1] : r ? `${r[2]} (${r[1].toUpperCase()})` : id; };   // always Latin letters (the API short name for a translation voice is in its own script)
   function setVoices(list) {
     const by = (x, y) => (x.id === "ar.alafasy" ? -1 : y.id === "ar.alafasy" ? 1 : x.full.localeCompare(y.full));
     RECITERS = list.filter(r => r.lang === "ar").sort(by).map(r => [r.id, r.full, r.name]);
@@ -813,7 +814,7 @@
   function syncReciters(rebuildAuto = true) {
     if (rebuildAuto) { const o = $("#plTrRec").options[0], o2 = $("#optTrRec").options[0]; if (o) o.textContent = trAutoLabel(); if (o2) o2.textContent = trAutoLabel(); }
     [$("#plReciter"), $("#optReciter")].forEach(s => { s.value = A.reciter; }); [$("#plTrRec"), $("#optTrRec")].forEach(s => { s.value = A.trRec; });
-    syncVoiceBtn();
+    syncVoiceBtn(); if (window.GQOff) GQOff.rows();   // the Offline library names the voices it will save
   }
   $("#plReciter").onchange = e => setReciter(e.target.value); $("#optReciter").onchange = e => setReciter(e.target.value);
   $("#plTrRec").onchange = e => setTrRec(e.target.value); $("#optTrRec").onchange = e => setTrRec(e.target.value);
@@ -1639,8 +1640,15 @@
       textIds: () => [...new Set(["quran-uthmani", "quran-tajweed", ...S.trs, ...(S.rdTr ? [S.rdTr] : []), ...(TL.on && TL.id ? [TL.id] : [])])],   // every edition the page can draw
       voices: () => {   // the voices the player would use: the Quran reciter, the translation voice, or the default reciter when both are off
         const ids = []; if (A.reciter) ids.push(A.reciter); const t = trRecId(); if (t && !ids.includes(t)) ids.push(t); if (!ids.length) ids.push("ar.alafasy");
-        return ids.map(id => { const q = RECITERS.find(r => r[0] === id), r = TR_REC.find(x => x[0] === id), v = audioVariants(id)[0] || audioVariant(id); return { id, kbs: v.kbs, name: q ? q[1] : r ? `${r[4]} (${r[1].toUpperCase()})` : id }; });
+        return ids.map(id => { const v = audioVariants(id)[0] || audioVariant(id); return { id, kbs: v.kbs, name: voiceName(id), role: RECITERS.some(r => r[0] === id) ? "quran" : "tr" }; });
       },
+      voiceName,
+      /* what the "Change voices" sheet offers: the same lists as the player's two menus (never a native-script name, so every name reads in English letters) */
+      voiceLists: () => ({
+        quran: { cur: A.reciter, items: RECITERS.map(r => ({ id: r[0], name: r[1] })) },
+        tr: { cur: A.trRec, auto: trRecId() ? voiceName(trRecId()) : "", groups: [...new Set(TR_REC.map(r => r[1]))].map(l => ({ lang: l, label: langNames(l).en || langNames(l).nat, items: TR_REC.filter(r => r[1] === l).map(r => ({ id: r[0], name: r[2] })) })) }
+      }),
+      setReciter, setTrRec,
       audioUrl: (id, g) => audioFile(id, g, 0), marks: () => bms.map(k => +String(k).split(":")[0])
     });
     const opening = openSurah(s, a, { flash: false, via: "start" });
