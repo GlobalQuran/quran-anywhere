@@ -13,6 +13,7 @@
  *   data-translation any Global Quran translation id, e.g. en.sahih, fr.hamidullah, ur.jalandhry (several: "en.sahih,ur.jalandhry"), or none
  *   data-theme       day | night | auto (follows the visitor's system)      data-accent   hex colour, no #
  *   data-player      0 hides the audio player                               data-font     mushaf | amiri | me
+ *   data-login       0 turns off the "keep your saved verses on every device" sign-in prompt (saved verses then stay on the visitor's device)
  *   data-api-key     your Global Quran API key (optional)
  *   data-api-url     use another API base URL (default https://api.globalquran.com)
  *
@@ -26,7 +27,7 @@
   function mount(el) {
     if (el.__gq) return; el.__gq = true;
     var d = el.dataset, q = ["embed=1"];
-    [["surah", "surah"], ["ayah", "ayah"], ["theme", "theme"], ["accent", "accent"], ["font", "font"], ["sidebar", "sidebar"], ["player", "player"]].forEach(function (p) {
+    [["surah", "surah"], ["ayah", "ayah"], ["theme", "theme"], ["accent", "accent"], ["font", "font"], ["sidebar", "sidebar"], ["player", "player"], ["login", "login"]].forEach(function (p) {
       if (d[p[0]] != null && d[p[0]] !== "") q.push(p[1] + "=" + encodeURIComponent(d[p[0]]));
     });
     if (d.translation) q.push("tr=" + encodeURIComponent(d.translation === "none" ? "" : d.translation));

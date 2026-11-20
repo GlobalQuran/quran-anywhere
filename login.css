@@ -1,0 +1,30 @@
+/* Optional sign-in (login.js): the "keep it on every device" card, the sidebar card and the return-visit pill.
+   Uses the reader's own tokens (paper, gold, controls) so day and night both work. */
+.sg-card { position: fixed; z-index: 200; width: min(280px, calc(100vw - 20px)); background: var(--paper-c); color: var(--head); border: 1px solid var(--line); border-radius: 14px; padding: 14px 15px 13px; box-shadow: 0 14px 34px rgba(0,0,0,.28); font: 13px/1.4 var(--ui); display: flex; flex-direction: column; gap: 8px; animation: pop-in .18s var(--ease); }
+.sg-card[hidden] { display: none; }
+.sg-card h3 { margin: 0; padding-right: 22px; font: 700 14px var(--ui); color: var(--ink); }
+.sg-card p { margin: 0; color: var(--tr-ink); font-size: 12.5px; }
+.sg-x { position: absolute; right: 6px; top: 5px; width: 28px; height: 28px; border: 0; border-radius: 8px; background: none; color: var(--tr-ink); font-size: 19px; line-height: 1; }
+.sg-x:hover { background: var(--ctl-hover); }
+.sg-b { display: flex; align-items: center; justify-content: center; gap: 8px; height: 36px; border-radius: 18px; border: 1px solid #d0d0d0; background: #fff; color: #1f1f1f; font: 600 13px var(--ui); transition: filter var(--t), transform var(--t); }
+.sg-b:hover { filter: brightness(.96); } .sg-b:active { transform: scale(.98); }
+.sg-b.sg-a { background: #000; border-color: #000; color: #fff; } .sg-b.sg-a:hover { filter: brightness(1.25); }
+.sg-b svg { width: 16px; height: 16px; }
+.sg-link { align-self: center; border: 0; background: none; padding: 2px 4px; font: 700 12.5px var(--ui); color: var(--cite); }
+.sg-link:hover { text-decoration: underline; } html.night .sg-link { color: var(--accent); }
+.sg-card::before { content: ""; position: absolute; top: -6px; left: var(--ax, 40px); width: 11px; height: 11px; background: var(--paper-c); border-left: 1px solid var(--line); border-top: 1px solid var(--line); transform: rotate(45deg); }
+.sg-card.up::before { top: auto; bottom: -6px; transform: rotate(225deg); }
+.sg-card.sheet { left: 0 !important; right: 0; top: auto !important; bottom: 0; width: auto; max-width: none; border-width: 1px 0 0; border-radius: 18px 18px 0 0; padding: 16px 18px calc(18px + env(safe-area-inset-bottom, 0px)); }
+.sg-card.sheet::before { display: none; }
+.sg-pill { position: fixed; z-index: 190; left: 50%; transform: translateX(-50%); bottom: calc(76px + env(safe-area-inset-bottom, 0px)); max-width: calc(100vw - 20px); display: flex; align-items: center; gap: 10px; padding: 7px 8px 7px 16px; border: 1px solid var(--line); border-radius: 22px; background: var(--paper-c); color: var(--head); box-shadow: 0 8px 24px rgba(0,0,0,.25); font: 13px var(--ui); animation: toast-in .25s var(--ease); }
+.sg-pill[hidden] { display: none; }
+.sg-pill b { color: var(--ink); }
+.sg-pill .ob { min-height: 30px; }
+.sg-side { margin: 0 0 10px; padding: 11px 12px; border: 1px solid var(--sb-line); border-radius: 12px; background: var(--sb-field); color: var(--sb-ink); font: 12.5px/1.4 var(--ui); }
+.sg-side b { display: block; font: 700 13px var(--ui); margin-bottom: 2px; }
+.sg-side small { display: block; color: var(--sb-mute); font-size: 12px; }
+.sg-side .ob { margin-top: 8px; min-height: 30px; font-size: 12px; }
+.sg-side.on { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.sg-side.on > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sg-side .sg-link { color: var(--sb-gold); flex: none; }
+@media (prefers-reduced-motion: reduce) { .sg-card, .sg-pill { animation: none; } }

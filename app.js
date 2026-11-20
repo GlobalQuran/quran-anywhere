@@ -12,9 +12,16 @@
   if (window.GQ_QS) new URLSearchParams(window.GQ_QS).forEach((v, k) => { if (!qs.has(k)) qs.append(k, v); });   // parameters handed over by a server-side wrapper (the old PHP "upload-auto" proxy)
   const EMBED = qs.get("embed") === "1";
   const mem = {};
-  const store = EMBED ? { get: k => mem[k] ?? null, set: (k, v) => { mem[k] = v; } } : {
+  /* login.js listens to this to keep a signed-in reader's saved verses, place and settings in step across devices */
+  const emit = k => { try { dispatchEvent(new CustomEvent("gq:store", { detail: { k } })); } catch (e) {} };
+  /* an embed keeps nothing between visits except the visitor's own saved verses (never the look the host page chose) */
+  const EMBED_KEEP = { bm: 1 };
+  const store = EMBED ? {
+    get: k => { if (EMBED_KEEP[k]) { try { const v = localStorage.getItem("gq2e." + k); if (v != null) return v; } catch (e) {} } return mem[k] ?? null; },
+    set: (k, v) => { mem[k] = v; if (EMBED_KEEP[k]) { try { localStorage.setItem("gq2e." + k, v); } catch (e) {} } emit(k); }
+  } : {
     get: k => { try { return localStorage.getItem("gq2." + k); } catch (e) { return null; } },
-    set: (k, v) => { try { localStorage.setItem("gq2." + k, v); } catch (e) {} }
+    set: (k, v) => { try { localStorage.setItem("gq2." + k, v); } catch (e) {} emit(k); }
   };
   if (EMBED) { root.classList.add("embed"); if (qs.get("sidebar") === "1") root.classList.add("embed-side"); if (qs.get("player") === "0") root.classList.add("noplayer"); }
   const accent = qs.get("accent"); if (accent && /^#?[0-9a-f]{3,8}$/i.test(accent)) root.style.setProperty("--gold", "#" + accent.replace("#", ""));
@@ -526,7 +533,7 @@
     if (act === "nextSurah") return openSurah(S.s + 1, 1, { via: "end_button" });
     const n = +el.dataset.n, key = S.s + ":" + n; if (act !== "mark") stat("ayah_action", { action: act, surah: S.s, ayah: n, ref: key });   // which verses are played / copied / saved (no one's list, no identity)
     if (act === "play") { playAyah(n); selectAyah(n, S.view === "verse"); }
-    if (act === "mark") { const i = bms.indexOf(key); i < 0 ? bms.push(key) : bms.splice(i, 1); stat("ayah_action", { action: i < 0 ? "save" : "unsave", surah: S.s, ayah: n, ref: key }); store.set("bm", JSON.stringify(bms)); $("[data-act=mark]", el).setAttribute("aria-pressed", i < 0); drawMarks(); syncSavedUi(); toast(i < 0 ? "Saved" : "Removed"); }
+    if (act === "mark") { const i = bms.indexOf(key); i < 0 ? bms.push(key) : bms.splice(i, 1); stat("ayah_action", { action: i < 0 ? "save" : "unsave", surah: S.s, ayah: n, ref: key }); store.set("bm", JSON.stringify(bms)); $("[data-act=mark]", el).setAttribute("aria-pressed", i < 0); drawMarks(); syncSavedUi(); toast(i < 0 ? "Saved" : "Removed"); if (i < 0) dispatchEvent(new CustomEvent("gq:saved", { detail: { key } })); }
     if (act === "share") return shareAyah(S.s, n);
     if (act === "copy") {
       const t = [arText(S.s, n), ...(TL.on ? [tlText(S.s, n)] : []), ...trTexts(S.s, n), `— ${meta(S.s).en} ${key}`].join("\n");
@@ -1670,5 +1677,11 @@
     if (s !== S.s || S.mode === "saved") openSurah(s, a, { via: "link" }); else if (a !== (S.cur || 1)) jumpAyah(a, { smooth: true });
   }
   addEventListener("hashchange", onAddress); addEventListener("popstate", onAddress);
+  /* the small surface login.js needs (sign-in is optional and lives in its own file) */
+  window.GQApp = {
+    EMBED, store, toast,
+    getBms: () => bms.slice(),
+    setBms(list) { bms = list.slice(); store.set("bm", JSON.stringify(bms)); drawMarks(); markBookmarks(); syncSavedUi(); if (S.mode === "saved") renderSaved(); },
+  };
   init();
 })();
