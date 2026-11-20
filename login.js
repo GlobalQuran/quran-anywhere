@@ -3,7 +3,7 @@
  * Nothing here is needed to read. Saved verses, the place you stopped and settings live on the device as before; signing in
  * only keeps them on every device. Three places ask, none of them a wall:
  *   - a small card next to the Save button, right after a verse is saved (also in embeds, where sign-in opens in a window)
- *   - a card on the sidebar's Saved tab
+ *   - a Sign in card on the menu's Saved tab (once signed in, Sign out is at the top of Settings)
  *   - on a return visit, Google's "Continue as ..." card, or a small "pick up where you stopped" pill
  * Closing a card with its x hides asking for 3 days; after 3 closes it never asks again.
  *
@@ -179,17 +179,20 @@
     setTimeout(() => showCard(vis), 250);
   });
 
-  /* ---------- the sidebar card (website only) ---------- */
-  let side = null;
+  /* ---------- the menu (website only): "Sign in" on the Saved tab, "Sign out" at the top of Settings ---------- */
+  let side = null, acct = null;
   function renderSide() {
     if (EMBED) return;
-    const list = $("#markList"); if (!list) return;
+    const list = $("#markList"), set = $("#tab-settings"); if (!list || !set) return;
     if (!side) { side = el("div"); list.parentNode.insertBefore(side, list); }
+    if (!acct) { acct = el("div"); set.insertBefore(acct, set.firstChild); }
     if (user) {
-      side.className = "sg-side on";
-      side.innerHTML = '<span>Signed in as <b style="display:inline;font:inherit;font-weight:700">' + esc(user.name || user.email || "you") + '</b></span><button class="sg-link" type="button">Sign out</button>';
-      $("button", side).onclick = signOut;
+      side.hidden = true; acct.hidden = false;
+      acct.className = "sg-side on";
+      acct.innerHTML = '<span>Signed in as <b style="display:inline;font:inherit;font-weight:700">' + esc(user.name || user.email || "you") + '</b></span><button class="sg-link" type="button">Sign out</button>';
+      $("button", acct).onclick = signOut;
     } else {
+      acct.hidden = true; side.hidden = false;
       side.className = "sg-side";
       side.innerHTML = '<b>Keep these on every device</b><small>Sign in to keep your saved verses, where you stopped and your settings.</small><button class="ob pri" type="button">Sign in</button>';
       $("button", side).onclick = () => startSignIn();

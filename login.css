@@ -24,6 +24,7 @@
 .sg-side b { display: block; font: 700 13px var(--ui); margin-bottom: 2px; }
 .sg-side small { display: block; color: var(--sb-mute); font-size: 12px; }
 .sg-side .ob { margin-top: 8px; min-height: 30px; font-size: 12px; }
+.sg-side[hidden] { display: none; }
 .sg-side.on { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .sg-side.on > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sg-side .sg-link { color: var(--sb-gold); flex: none; }
