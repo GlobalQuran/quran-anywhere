@@ -58,7 +58,7 @@
   const loadProviders = () => providers ? Promise.resolve(providers) : fetch(AUTH + "/api/gq/providers").then(r => r.json()).then(p => (providers = p)).catch(() => (providers = { providers: [] }));
 
   /* ---------- what is kept ---------- */
-  const SET_KEYS = ["trs", "rtr", "reciter", "theme", "font", "fsAr", "fsTr", "layout", "speed", "tajweed", "tlit", "wbw", "credit", "follow", "rdtr", "rd", "tabs"];
+  const SET_KEYS = ["trs", "rtr", "reciter", "theme", "font", "fsAr", "fsTr", "layout", "speed", "tajweed", "tlit", "wbw", "credit", "follow", "rdtr", "rd", "tabs", "view", "lastview", "mode", "modes", "tlid", "lsbg", "keyhide"];
   function collect() {
     const d = { bm: App.getBms() };
     if (!EMBED) {   // an embed only keeps saved verses: the host page decides the look and where it opens
@@ -83,7 +83,7 @@
     const id = String(user.user_id);
     if (kv.get("syncUser") !== id) {   // first time on this device: put what is saved here together with the account's
       const r = await api("/api/gq/sync", { method: "PUT", body: { merge: true, data: collect() } });
-      apply(r.data, false); kv.set("syncUser", id); kv.set("dirty", "0");
+      apply(r.data, true); kv.set("syncUser", id); kv.set("dirty", "0");
     } else if (kv.get("dirty") === "1") { await push();
     } else { const r = await api("/api/gq/sync"); apply(r.data, !fresh); }
   }
