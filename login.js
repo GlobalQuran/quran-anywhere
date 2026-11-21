@@ -58,7 +58,7 @@
   const loadProviders = () => providers ? Promise.resolve(providers) : fetch(AUTH + "/api/gq/providers").then(r => r.json()).then(p => (providers = p)).catch(() => (providers = { providers: [] }));
 
   /* ---------- what is kept ---------- */
-  const SET_KEYS = ["trs", "rtr", "reciter", "theme", "font", "fsAr", "fsTr", "layout", "speed", "tajweed", "tlit", "wbw", "credit", "follow", "rdtr", "rd", "tabs", "view", "lastview", "mode", "modes", "tlid", "lsbg", "keyhide"];
+  const SET_KEYS = ["trs", "rtr", "reciter", "theme", "font", "fsAr", "fsTr", "layout", "speed", "tajweed", "tlit", "wbw", "credit", "follow", "rdtr", "rd", "tabs", "view", "lastview", "mode", "modes", "tlid", "lsbg", "keyhide", "tr"];
   function collect() {
     const d = { bm: App.getBms() };
     if (!EMBED) {   // an embed only keeps saved verses: the host page decides the look and where it opens
