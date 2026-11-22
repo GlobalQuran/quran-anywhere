@@ -452,7 +452,8 @@
     n = clamp(n, 1, 114); if (S.mode === "saved") exitSaved(); if (!opts.keepAudio) stopAudio(); const tok = ++openTok;
     const before = $(".ayah", inner) ? [S.s, S.cur || 1] : null;
     if (!downKind) { S.retry = () => openSurah(n, ayah, opts); S.undo = before && before[0] !== n ? () => openSurah(before[0], before[1], { flash: false }) : null; }
-    await prepare(n); if (tok !== openTok) return;
+    const was = downN; await prepare(n); if (tok !== openTok) return;
+    if (downKind && downN === was && !listsDown) upAgain();   // the error screen was for an earlier surah that could not load; this one did (saved or the connection is back), so the screen must go, not stay over a working reader
     if (!downKind) S.retry = S.undo = null;
     renderSurah(n); closeMenu(); lsAfterOpen(ayah); PROG.s = n; PROG.got = 0; PROG.at = Date.now(); if (["sidebar", "picker", "arrows", "end_button", "keyboard"].includes(opts.via) && modesOn()) putAwayModes(); stat("surah_open", { surah: n, via: opts.via || "load", view: S.view });
     S.cur = 0; S.curS = 0;
@@ -624,8 +625,9 @@
     rate: ["Please slow down for a moment", "There were too many requests in a short time. Wait a minute, then try again."],
     key: ["This isn't allowed from here", "The service refused the request. If you run this site, check the API key and the allowed domain."]
   };
-  let downKind = "";
+  let downKind = "", downN = 0, listsDown = false;   // downN counts every time the screen is shown; listsDown: the screen is for the lists failing at start (opening a surah does not cure that)
   function down(e, o = {}) {
+    downN++;
     const kind = OOPS[e && e.kind] ? e.kind : (navigator.onLine === false ? "offline" : "network"); downKind = kind;
     stat("error_screen", { kind, status: (e && e.status) || 0 });
     const t = OOPS[kind]; $("#oopsT").textContent = t[0]; $("#oopsP").textContent = t[1];
@@ -636,7 +638,7 @@
   }
   function upAgain() {
     if (qs.has("oops")) { qs.delete("oops"); try { const q = qs.toString(); history.replaceState(null, "", location.origin + location.pathname + (q ? "?" + q : "") + location.hash); } catch (e) {} }   // a previewed error must not come back on refresh
-    $("#oops").hidden = true; root.classList.remove("down"); downKind = ""; requestAnimationFrame(() => { recalc(); }); }
+    $("#oops").hidden = true; root.classList.remove("down"); downKind = ""; listsDown = false; requestAnimationFrame(() => { recalc(); }); }
   $("#oopsRetry").onclick = () => { upAgain(); if (S.retry) S.retry(); else location.reload(); };
   $("#oopsBack").onclick = () => { upAgain(); const u = S.undo; S.undo = S.retry = null; u && u(); };
   addEventListener("online", () => { if (downKind === "offline") $("#oopsRetry").click(); });
@@ -1610,7 +1612,7 @@
   async function init() {
     const route = readAddress();
     const [data, lists] = await Promise.all([fetch("data/surahs.json").then(r => r.json()), loadLists()]);
-    const trList = lists.tr; S.data = data; if (lists.failed) { S.undo = S.retry = null; down(lists.failed); }
+    const trList = lists.tr; S.data = data; if (lists.failed) { S.undo = S.retry = null; listsDown = true; down(lists.failed); }
     // surah names / counts / global start / juz: the API is the source; the local skeleton is only for the very first, offline-safe paint
     try { mergeSurahs(await Promise.race([GQ.surahs(), new Promise((_, rej) => setTimeout(() => rej(new Error("slow")), 900))])); } catch (e) { GQ.surahs().then(d => { mergeSurahs(d); buildSurahList(); }).catch(() => {}); } S.trList = trList; S.tlList = lists.tl; setVoices(lists.rec);
     const linked = route.eds.filter(id => trList.some(t => t.id === id)); if (linked.length) S.trs = linked;   // translations named in an old-style link
