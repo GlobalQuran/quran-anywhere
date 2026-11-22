@@ -625,12 +625,13 @@
     rate: ["Please slow down for a moment", "There were too many requests in a short time. Wait a minute, then try again."],
     key: ["This isn't allowed from here", "The service refused the request. If you run this site, check the API key and the allowed domain."]
   };
+  const KEY_REQUIRED = ["API key is required", "This page needs a Global Quran API key to show anything. If you run this site, get a free key at docs.globalquran.com and add it (on an embed: data-api-key)."];   // the API answered 401: a new site without a key (see rules/api.md)
   let downKind = "", downN = 0, listsDown = false;   // downN counts every time the screen is shown; listsDown: the screen is for the lists failing at start (opening a surah does not cure that)
   function down(e, o = {}) {
     downN++;
     const kind = OOPS[e && e.kind] ? e.kind : (navigator.onLine === false ? "offline" : "network"); downKind = kind;
     stat("error_screen", { kind, status: (e && e.status) || 0 });
-    const t = OOPS[kind]; $("#oopsT").textContent = t[0]; $("#oopsP").textContent = t[1];
+    const t = kind === "key" && e && e.status === 401 ? KEY_REQUIRED : OOPS[kind]; $("#oopsT").textContent = t[0]; $("#oopsP").textContent = t[1];
     $("#oopsD").textContent = [kind === "server" || kind === "key" || kind === "rate" ? "Error " + ((e && e.status) || "") : "", new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })].filter(Boolean).join(" · ").replace(/^Error \s*·/, "");
     $("#oopsBack").hidden = !((kind === "server" || kind === "offline") && S.undo);   // offline: the surah just tried is not saved, so going back to the one that was open is the way out
     try { stopAudio(); } catch (x) {}

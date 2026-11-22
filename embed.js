@@ -14,7 +14,8 @@
  *   data-theme       day | night | auto (follows the visitor's system)      data-accent   hex colour, no #
  *   data-player      0 hides the audio player                               data-font     mushaf | amiri | me
  *   data-login       0 turns off the "keep your saved verses on every device" sign-in prompt (saved verses then stay on the visitor's device)
- *   data-api-key     your Global Quran API key (optional)
+ *   data-api-key     your Global Quran API key. Required for sites that add the embed from 22 Nov 2026 (free: docs.globalquran.com); without it the
+ *                    frame shows "API key is required". Sites that embedded before then keep working as they are.
  *   data-api-url     use another API base URL (default https://api.globalquran.com)
  *
  * JavaScript API on the element:  el.globalquran.goto(36, 12)  .setTheme("night")  .setTranslation("en.sahih")  .play(5)  .pause()

@@ -4,7 +4,9 @@
 
    Configuration (all optional):
      window.GQ_API_URL   default https://api.globalquran.com        (or ?api=https://...)
-     window.GQ_API_KEY   sent as ?key=... only when set             (or ?key=...). Site config / embed data-api-key.
+     window.GQ_API_KEY   sent as ?key=... only when set             (or ?key=...). Site config / embed data-api-key. The apps set it per platform
+                         in native/native.js (ios, android, mac, windows, linux), the website gets its own key from the page (added by the hosting
+                         function, not kept in this repo), an embed uses the embedder's.
      window.GQ_APP       app version, default "v5"                   (or ?app=v3). The lists are asked for as ?app=<id>, so the API leaves out
                          what the admin ("Where it shows") hid from this version. Without it the API returns everything.
    Caching: lists are kept in localStorage for 24h and served stale while they refresh; surah text is kept in memory and IndexedDB. */
