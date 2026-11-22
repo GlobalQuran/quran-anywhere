@@ -546,6 +546,7 @@ window.GQOff = (() => {
   return {
     attach, get supported() { return supported; }, renderPop: () => { refreshFree(); renderPop(); }, onSurah, rows: () => { api && emit(); }, modalOpen: () => libOpen() || miniOpen(), closeLib,
     rowHtml: n => supported ? `<button type="button" class="og" data-og="${n}" aria-label="Save for offline"></button>` : "",
-    status: n => state(n)
+    status: n => state(n),
+    ready: () => Object.keys(ST.s).map(Number).filter(isReady).sort((x, y) => x - y)   // surahs whose reading part is saved (they open with no connection)
   };
 })();

@@ -630,7 +630,7 @@
     stat("error_screen", { kind, status: (e && e.status) || 0 });
     const t = OOPS[kind]; $("#oopsT").textContent = t[0]; $("#oopsP").textContent = t[1];
     $("#oopsD").textContent = [kind === "server" || kind === "key" || kind === "rate" ? "Error " + ((e && e.status) || "") : "", new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })].filter(Boolean).join(" · ").replace(/^Error \s*·/, "");
-    $("#oopsBack").hidden = !(kind === "server" && S.undo);
+    $("#oopsBack").hidden = !((kind === "server" || kind === "offline") && S.undo);   // offline: the surah just tried is not saved, so going back to the one that was open is the way out
     try { stopAudio(); } catch (x) {}
     $("#oops").hidden = false; root.classList.add("down"); $("#oopsRetry").focus({ preventScroll: true });
   }
@@ -1643,6 +1643,12 @@
     if (route.page) { try { [s, a] = await pageStart(route.page); } catch (e) {} }
     if (!s && store.get("pos")) { const p = store.get("pos").split(":"); s = +p[0]; a = +p[1] || 1; }
     s = clamp(s || 1, 1, 114); a = clamp(a, 1, meta(s).c);
+    /* started with no connection: a surah that is not saved cannot open, and the offline screen would cover everything (and come back on every start, since it is the remembered place).
+       Open a saved one instead: the remembered place if it is saved, else the last saved surah the person read, else the first. */
+    if (navigator.onLine === false && window.GQOff && !EMBED) {   // also when the address names the surah: a reload keeps the address of the one that failed
+      const rdy = (GQOff.ready && GQOff.ready()) || [];
+      if (rdy.length && !rdy.includes(s)) { const seen = (JSON.parse(localStorage.getItem("gq2.off") || "{}").seen || []).slice().reverse().find(n => rdy.includes(n)); s = seen || rdy[0]; a = 1; setTimeout(() => toast("You're offline, so a saved surah opened"), 1200); }
+    }
     syncView(); syncTrChip(); syncReciters();
     /* offline (offline.js): what only this file knows is handed over once; the cloud in the header, the status on each surah and the library are drawn there */
     if (window.GQOff && !EMBED) GQOff.attach({
