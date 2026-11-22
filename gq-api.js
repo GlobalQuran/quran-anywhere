@@ -5,11 +5,14 @@
    Configuration (all optional):
      window.GQ_API_URL   default https://api.globalquran.com        (or ?api=https://...)
      window.GQ_API_KEY   sent as ?key=... only when set             (or ?key=...). Site config / embed data-api-key.
+     window.GQ_APP       app version, default "v5"                   (or ?app=v3). The lists are asked for as ?app=<id>, so the API leaves out
+                         what the admin ("Where it shows") hid from this version. Without it the API returns everything.
    Caching: lists are kept in localStorage for 24h and served stale while they refresh; surah text is kept in memory and IndexedDB. */
 window.GQ = (() => {
   "use strict";
   const qs = new URLSearchParams(location.search);
-  const cfg = { base: String(window.GQ_API_URL || qs.get("api") || "https://api.globalquran.com").replace(/\/+$/, ""), key: window.GQ_API_KEY || qs.get("key") || "" };
+  const cfg = { base: String(window.GQ_API_URL || qs.get("api") || "https://api.globalquran.com").replace(/\/+$/, ""), key: window.GQ_API_KEY || qs.get("key") || "",
+    app: String(window.GQ_APP || qs.get("app") || "v5").toLowerCase().replace(/[^a-z0-9_.-]/g, "") };
   const ls = { get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} } };
 
   async function get(path, { timeout = 20000 } = {}) {
@@ -68,9 +71,9 @@ window.GQ = (() => {
 
   return {
     cfg, get, text,
-    translations: () => cached("translations", "/v2/list/translation"),
-    recitors: () => cached("recitors", "/v2/list/recitor"),
+    translations: () => cached("translations." + cfg.app, "/v2/list/translation?app=" + cfg.app),   // the cache key carries the app version, so an old complete list is never mistaken for this version's
+    recitors: () => cached("recitors." + cfg.app, "/v2/list/recitor?app=" + cfg.app),
     surahs: () => cached("surahs", "/v1/surah", 7 * 24 * 3600e3),   // names, ayah counts, global start ayah, juz
-    editions: () => cached("editions", "/v1/quran")      // every edition incl. transliterations (the v2 lists have none)
+    editions: () => cached("editions." + cfg.app, "/v1/quran?app=" + cfg.app)      // every edition incl. transliterations (the v2 lists have none)
   };
 })();
