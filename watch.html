@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, viewport-fit=cover">
+<title>Link your watch or TV · Global Quran</title>
+<meta name="description" content="Sign in on the Global Quran app for Apple Watch, Wear OS, Apple TV or Android TV by typing the code the device shows.">
+<meta name="robots" content="noindex">
+<link rel="canonical" href="https://globalquran.com/watch">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="/img/icons/favicon-32.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/img/icons/apple-touch-icon.png">
+<meta name="theme-color" content="#1a2224">
+<script>
+/* the same day / night choice as the reader (gq2.theme = day | night | auto) */
+(function () {
+  var t = null; try { t = localStorage.getItem("gq2.theme"); } catch (e) {}
+  if (t === "night" || (t !== "day" && window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches)) document.documentElement.classList.add("night");
+}());
+</script>
+<style>
+/* A standalone page in the reader's own look: the same tokens as app.css (gold, paper, ink), the Fontin brand face, a golden-framed paper card. */
+@font-face { font-family: "AmiriQuran"; src: url(/fonts/AmiriQuran-Regular.ttf) format("truetype"); font-display: swap; }
+@font-face { font-family: "Fontin"; font-weight: 700; src: url(/fonts/Fontin-Bold.ttf); font-display: swap; }
+:root {
+  --gold: #a58a3a; --gold-fill: #866e1f; --accent: #d5b75b; --cite: #8a7027;
+  --ink: #131313; --tr-ink: #3f3f3f; --line: #d4d2c8; --head: #2b2b2b;
+  --paper-c: #fbfbf9; --paper-b: #f4f4f1;
+  --ctl-bg: rgba(255,255,255,.55); --ctl-hover: rgba(165,138,58,.14); --sel: rgba(165,138,58,.2);
+  --ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --serif: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Palatino, Georgia, "Times New Roman", serif;
+  --brand: Fontin, Georgia, serif;
+  --t: .18s; --r: 10px;
+  --bg: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='112' height='112' viewBox='0 0 112 112'><g fill='none' stroke='%23fff' stroke-opacity='.14' stroke-width='.9'><circle cx='56' cy='56' r='34'/><circle cx='0' cy='0' r='34'/><circle cx='112' cy='0' r='34'/><circle cx='0' cy='112' r='34'/><circle cx='112' cy='112' r='34'/><circle cx='56' cy='56' r='6'/></g></svg>") center top / 112px 112px, linear-gradient(180deg, #6f8584 0, #a3b3ab 40%, #ced8ce 100%);
+  --on-bg: #1f2a2b; --on-bg-soft: rgba(31,42,43,.72);
+}
+html.night {
+  --ink: #efe9d6; --tr-ink: #c2cac8; --line: #465052; --head: #e6e9e7; --cite: #cfb35a;
+  --paper-c: #2e383a; --paper-b: #263032;
+  --ctl-bg: rgba(255,255,255,.06); --ctl-hover: rgba(213,183,91,.16); --sel: rgba(213,183,91,.18);
+  --bg: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='112' height='112' viewBox='0 0 112 112'><g fill='none' stroke='%23debe60' stroke-opacity='.08' stroke-width='.9'><circle cx='56' cy='56' r='34'/><circle cx='0' cy='0' r='34'/><circle cx='112' cy='0' r='34'/><circle cx='0' cy='112' r='34'/><circle cx='112' cy='112' r='34'/><circle cx='56' cy='56' r='6'/></g></svg>") center top / 112px 112px, linear-gradient(180deg, #1d2a2d 0, #141e20 45%, #0d1516 100%);
+  --on-bg: #e9efee; --on-bg-soft: rgba(233,239,238,.7);
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: 76px; }
+body { margin: 0; min-height: 100vh; background: #1d2628; background: var(--bg); background-attachment: fixed; color: var(--tr-ink); font: 16px/1.7 var(--ui); -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+::selection { background: rgba(213,183,91,.35); }
+a { color: var(--cite); text-underline-offset: 3px; } html.night a { color: var(--accent); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+
+.wrap { width: min(760px, 100%); margin: 0 auto; padding: 18px 16px 64px; padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right)); }
+.top { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0 0 22px; }
+.pill { display: inline-flex; align-items: center; gap: 7px; height: 38px; padding: 0 16px; border-radius: 19px; border: 1px solid transparent; background: var(--ctl-bg); color: var(--on-bg); font: 700 13px var(--ui); text-decoration: none; cursor: pointer; backdrop-filter: blur(6px); transition: background var(--t), border-color var(--t); }
+html:not(.night) .pill { border-color: rgba(31,42,43,.14); }
+.pill:hover { background: var(--ctl-hover); border-color: var(--gold); }
+html.night a.pill, a.pill { color: var(--on-bg); }
+.pill svg { width: 16px; height: 16px; stroke: currentColor; stroke-width: 2; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+
+.hero { text-align: center; margin: 4px 0 26px; color: var(--on-bg); }
+.brand { display: inline-flex; align-items: baseline; gap: 10px; text-decoration: none; }
+.brand .ar { display: inline-block; padding: 0 .18em; font: 40px/1.5 "AmiriQuran", serif;background: linear-gradient(180deg, #c9a944, #7d6318); -webkit-background-clip: text; background-clip: text; color: transparent; }
+html.night .brand .ar { background-image: linear-gradient(180deg, #f3de98, #c9a944); }
+.brand .en { font: 700 12px/1 var(--brand); letter-spacing: 3px; color: var(--on-bg); opacity: .85; }
+.hero h1 { margin: 6px 0 4px; font: 700 clamp(30px, 6vw, 40px)/1.15 var(--brand); letter-spacing: .01em; }
+.hero p { margin: 0 auto; max-width: 34em; font: 16px/1.6 var(--serif); font-style: italic; color: var(--on-bg-soft); }
+.orn { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 16px auto 0; color: var(--gold); }
+.orn::before, .orn::after { content: ""; width: min(90px, 22vw); height: 1px; background: linear-gradient(90deg, transparent, currentColor); }
+.orn::after { transform: scaleX(-1); }
+.orn i { width: 7px; height: 7px; background: currentColor; transform: rotate(45deg); }
+
+.jump { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin: 0 0 22px; }
+.jump .pill { height: 36px; font-size: 13px; }
+
+.card { margin: 0 0 18px; padding: 24px 28px 20px; border: 1px solid var(--gold); border-radius: 8px; background: var(--paper-c); color: var(--tr-ink); box-shadow: 0 12px 30px rgba(0,0,0,.2), inset 0 0 0 4px var(--paper-c), inset 0 0 0 5px rgba(165,138,58,.28); }
+html.night .card { box-shadow: 0 12px 30px rgba(0,0,0,.4), inset 0 0 0 4px var(--paper-c), inset 0 0 0 5px rgba(213,183,91,.22); }
+.card h2 { margin: 0 0 4px; font: 700 23px/1.25 var(--brand); color: var(--head); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.card h3 { margin: 22px 0 4px; font: 700 11px/1.3 var(--ui); letter-spacing: .16em; text-transform: uppercase; color: var(--cite); }
+html.night .card h3 { color: var(--accent); }
+.tag { font: 700 11px/1 var(--ui); letter-spacing: .08em; text-transform: uppercase; padding: 5px 9px; border-radius: 12px; background: var(--sel); color: var(--cite); }
+html.night .tag { color: var(--accent); }
+.card p { margin: 8px 0 0; }
+.card p.lead { font: 18px/1.65 var(--serif); color: var(--head); margin-top: 6px; }
+.card ul { margin: 8px 0 0; padding: 0; list-style: none; }
+.card li { position: relative; margin: 0 0 7px; padding-left: 22px; }
+.card li::before { content: ""; position: absolute; left: 4px; top: .72em; width: 6px; height: 6px; background: var(--gold); transform: rotate(45deg); }
+.card b { color: var(--head); font-weight: 700; }
+code { font: 13.5px ui-monospace, SFMono-Regular, Menlo, monospace; padding: 1px 6px; border-radius: 5px; background: var(--sel); color: var(--head); word-break: break-word; }
+.rule { height: 1px; margin: 18px 0 2px; border: 0; background: var(--line); }
+.when { text-align: center; margin: 24px 0 0; font: 13px var(--ui); color: var(--on-bg-soft); }
+
+@media (max-width: 520px) {
+  .card { padding: 20px 18px 16px; }
+  .card h2 { font-size: 21px; }
+  .brand .ar { font-size: 34px; }
+}
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } .pill { transition: none; } }
+
+/* the code box and its buttons */
+.steps { counter-reset: s; list-style: none; margin: 10px 0 0; padding: 0; }
+.steps li { counter-increment: s; position: relative; padding-left: 40px; margin: 0 0 12px; }
+.steps li::before { content: counter(s); position: absolute; left: 0; top: -2px; width: 28px; height: 28px; border-radius: 50%; border: 1.5px solid var(--gold); background: none; transform: none; color: var(--cite); font: 700 13px/25px var(--ui); text-align: center; }
+html.night .steps li::before { color: var(--accent); }
+.field { display: flex; flex-wrap: wrap; gap: 10px; margin: 14px 0 0; }
+.field input { flex: 1 1 11em; min-width: 0; height: 52px; padding: 0 16px; border-radius: 10px; border: 1.5px solid var(--line); background: var(--paper-b); color: var(--head); font: 700 26px/1 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .18em; text-transform: uppercase; text-align: center; }
+.field input::placeholder { color: var(--line); letter-spacing: .18em; }
+.btn { height: 52px; padding: 0 24px; border-radius: 26px; border: 0; background: var(--gold-fill); color: #fff; font: 700 15px var(--ui); cursor: pointer; transition: filter var(--t); }
+.btn:hover { filter: brightness(1.1); } .btn[disabled] { opacity: .5; cursor: default; }
+.btn.ghost { background: transparent; color: var(--head); box-shadow: inset 0 0 0 1.5px var(--gold); height: 44px; }
+.who { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 10px 14px; border-radius: 10px; background: var(--sel); color: var(--head); }
+.who a { font-size: 14px; }
+.msg { margin: 14px 0 0; padding: 12px 14px; border-radius: 10px; font: 15px/1.5 var(--ui); }
+.msg.ok { background: rgba(60,140,90,.16); color: var(--head); } .msg.bad { background: rgba(190,70,60,.15); color: var(--head); }
+.signin { display: flex; flex-wrap: wrap; gap: 10px; margin: 14px 0 0; }
+[hidden] { display: none !important; }
+
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <a class="pill" href="/"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>Back to the Quran</a>
+    <button class="pill" id="theme" type="button" aria-label="Switch between day and night"><svg viewBox="0 0 24 24" aria-hidden="true"><path id="themeIcon" d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z"/></svg><span id="themeTxt">Night</span></button>
+  </div>
+
+  <header class="hero">
+    <a class="brand" href="/" aria-label="Global Quran home"><span class="ar">العالمي</span><span class="en">GLOBAL QURAN</span></a>
+    <h1>Link your watch or TV</h1>
+    <p>Sign in on the Global Quran app for Apple Watch, Wear OS, Apple TV or Android TV by typing the code it shows. Signing in is optional: the apps play everything without it.</p>
+    <div class="orn" aria-hidden="true"><i></i></div>
+  </header>
+
+  <section class="card" id="link">
+    <h2>Enter the code from your watch or TV</h2>
+    <ol class="steps">
+      <li>On a watch, open Global Quran, then <b>More</b>, <b>Account</b>, <b>Sign in</b>. On a TV, open Global Quran, then <b>Settings</b>, <b>Account</b>, <b>Sign in</b>. It shows a code such as <code>KQRM-48</code>.</li>
+      <li>Sign in here with the same account you use on the website and the phone apps.</li>
+      <li>Type the code below. The watch or TV signs itself in within a few seconds.</li>
+    </ol>
+
+    <div id="out" hidden>
+      <div class="signin"><button class="btn" id="signin" type="button">Sign in</button></div>
+      <p style="font-size:14px">Google, Apple or an email code. A window opens on the Global Quran sign-in page.</p>
+    </div>
+
+    <div id="in" hidden>
+      <div class="who"><span>Signed in as <b id="name"></b></span><a href="#" id="signout">Not you? Sign out</a></div>
+      <form class="field" id="form" autocomplete="off">
+        <input id="code" name="code" inputmode="text" autocapitalize="characters" autocorrect="off" spellcheck="false" maxlength="9" placeholder="KQRM-48" aria-label="Code shown on the watch or TV" required>
+        <button class="btn" id="go" type="submit">Link device</button>
+      </form>
+    </div>
+    <div class="msg" id="msg" role="status" aria-live="polite" hidden></div>
+
+    <h3>What this does</h3>
+    <p>A watch or TV gets the same sign-in as the phone apps. A watch keeps <b>only the place where you stopped</b> (surah and ayah) in step with your other devices. A TV keeps that place and also your listening settings (reciter, translation, Arabic text, light or dark and the background), so it looks and sounds the same as your other devices. You can sign out, or delete your account, in the app under <b>Account</b>. See the <a href="/privacy">privacy page</a>.</p>
+  </section>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  /* Where things are. Overrides (for testing) only for localhost and our own hosts, like the reader's sign-in. */
+  var qs = new URLSearchParams(location.search);
+  function okHost(h) { return h === "localhost" || h === "127.0.0.1" || /(^|\.)globalquran\.com$/.test(h); }
+  function base(v, fb) { try { var u = new URL(v); return okHost(u.hostname) ? u.origin : fb; } catch (e) { return fb; } }
+  var AUTH = base(window.GQ_AUTH_URL || qs.get("auth"), "https://api-login.globalquran.com");
+  var LOGIN = base(window.GQ_LOGIN_URL || qs.get("loginurl"), "https://login.globalquran.com");
+  var $ = function (id) { return document.getElementById(id); };
+  var out = $("out"), inn = $("in"), msg = $("msg"), user = null;
+
+  function say(text, ok) { msg.textContent = text; msg.className = "msg " + (ok ? "ok" : "bad"); msg.hidden = !text; }
+  function render() {
+    out.hidden = !!user; inn.hidden = !user;
+    if (user) { $("name").textContent = user.name || user.email || "your account"; $("code").focus(); }
+  }
+  function check() {
+    return fetch(AUTH + "/api/gq/session", { credentials: "include", headers: { Accept: "application/json" } })
+      .then(function (r) { return r.ok ? r.json() : null; }).then(function (s) { user = s && s.user ? s.user : null; })
+      .catch(function () { user = null; }).then(render);
+  }
+
+  $("signin").addEventListener("click", function () {
+    var u = new URL(LOGIN + "/");
+    u.searchParams.set("mode", "popup"); u.searchParams.set("origin", location.origin); u.searchParams.set("reason", "watch");
+    var w = window.open(u.href, "gq-login", "popup=yes,width=440,height=700");
+    if (!w) { var f = new URL(LOGIN + "/"); f.searchParams.set("reason", "watch"); f.searchParams.set("redirect", location.href); location.href = f.href; return; }
+    var t = setInterval(function () { if (w.closed) { clearInterval(t); check(); } }, 700);
+  });
+  addEventListener("message", function (e) { if (e.origin === LOGIN && e.data && e.data.type === "gq-login") check(); });
+
+  $("signout").addEventListener("click", function (e) {
+    e.preventDefault();
+    fetch(AUTH + "/api/v1/auth/logout", { method: "POST", credentials: "include" }).catch(function () {}).then(function () { user = null; say("", true); render(); });
+  });
+
+  $("code").addEventListener("input", function () {   // KQRM48 -> KQRM-48 while typing
+    var c = this.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
+    this.value = c.length > 4 ? c.slice(0, 4) + "-" + c.slice(4) : c;
+  });
+  $("form").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var code = $("code").value.trim(); if (!code) return;
+    var go = $("go"); go.disabled = true; say("", true);
+    fetch(AUTH + "/api/gq/app/device/approve", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify({ user_code: code }) })
+      .then(function (r) { return r.json().catch(function () { return {}; }).then(function (b) { return { ok: r.ok, status: r.status, b: b }; }); })
+      .then(function (r) {
+        if (r.ok) { say("Linked. Your " + (r.b.device || "device") + " is signing in; you can close this page.", true); $("code").value = ""; }
+        else if (r.status === 401) { user = null; render(); say("Please sign in again, then enter the code.", false); }
+        else say(r.b.detail || "That did not work. Check the code on the screen and try again.", false);
+      })
+      .catch(function () { say("Could not reach Global Quran. Check your connection and try again.", false); })
+      .then(function () { go.disabled = false; });
+  });
+
+  check();
+}());
+</script>
+<script>
+(function () {
+  var root = document.documentElement, btn = document.getElementById("theme"), txt = document.getElementById("themeTxt"), ico = document.getElementById("themeIcon");
+  var MOON = "M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z", SUN = "M12 4V2m0 20v-2m8-8h2M2 12h2m13.7-5.7 1.4-1.4M4.9 19.1l1.4-1.4m0-11.4L4.9 4.9m14.2 14.2-1.4-1.4M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z";
+  function show() { var n = root.classList.contains("night"); txt.textContent = n ? "Day" : "Night"; ico.setAttribute("d", n ? SUN : MOON); }
+  btn.addEventListener("click", function () {
+    var n = !root.classList.contains("night"); root.classList.toggle("night", n);
+    try { localStorage.setItem("gq2.theme", n ? "night" : "day"); } catch (e) {}
+    show();
+  });
+  show();
+}());
+</script>
+</body>
+</html>
