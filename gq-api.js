@@ -14,11 +14,14 @@ window.GQ = (() => {
   "use strict";
   const qs = new URLSearchParams(location.search);
   const cfg = { base: String(window.GQ_API_URL || qs.get("api") || "https://api.globalquran.com").replace(/\/+$/, ""), key: window.GQ_API_KEY || qs.get("key") || "",
-    app: String(window.GQ_APP || qs.get("app") || "v5").toLowerCase().replace(/[^a-z0-9_.-]/g, "") };
+    app: String(typeof window.GQ_APP === "string" && window.GQ_APP || qs.get("app") || "v5").toLowerCase().replace(/[^a-z0-9_.-]/g, "") };   // GQ_APP is an object in the apps (native.js): only a string counts here
+  /* an embedded reader (embed.js, iframe on globalquran.com) calls the API as globalquran.com, so it says which site embeds it (?from=), and the API lists that site */
+  const from = qs.get("embed") === "1" ? String(qs.get("from") || "").toLowerCase().replace(/[^a-z0-9.-]/g, "").slice(0, 190) : "";
   const ls = { get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} } };
 
   async function get(path, { timeout = 20000 } = {}) {
-    const url = cfg.base + path + (cfg.key ? (path.includes("?") ? "&" : "?") + "key=" + encodeURIComponent(cfg.key) : "");
+    const extra = cfg.key ? "key=" + encodeURIComponent(cfg.key) : from ? "from=" + from : "";   // with a key the API already knows who it is
+    const url = cfg.base + path + (extra ? (path.includes("?") ? "&" : "?") + extra : "");
     const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), timeout);
     /* every failure carries e.kind: "offline" | "network" | "timeout" | "server" (5xx, or the API itself reports an error such as a database problem)
        | "rate" (429) | "key" (401/403) | "client" (other 4xx), and e.status when there was a response, so the app can explain it properly */
