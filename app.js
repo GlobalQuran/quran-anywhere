@@ -6,12 +6,36 @@
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const root = document.documentElement, app = $("#app"), scroller = $("#scroll"), inner = $("#inner");
+  /* words and numbers in the reader's language (i18n.js) */
+  const T = GQL.t, TN = GQL.tn, N = GQL.num;
+  /* a surah's name: written in Arabic where the menus use Arabic letters, else its usual Latin spelling; the English meaning only on English menus */
+  const arName = m => String(m.ar || "").replace(/[\u064B-\u065F\u0670\u06D6-\u06ED]/g, "").replace(/^سورة\s+/, "").replace(/ٱ/g, "ا");
+  const sName = m => ["ar", "fa", "ur"].includes(GQL.ui) ? arName(m) || m.en : m.en;
+  const sMean = m => GQL.ui === "en" ? m.me : "";
+  const ref = (s, n) => N(s + ":" + n);
+  /* what a search box compares: any digits as 0-9, Arabic, Persian and Urdu spellings of a letter as one, no marks, hyphens or apostrophes */
+  const fold = v => GQL.asc(v).toLowerCase().replace(/[\u064B-\u065F\u0670\u06D6-\u06ED\u0640\-']/g, "").replace(/[أإآٱ]/g, "ا").replace(/[ىی]/g, "ي").replace(/ک/g, "ك").replace(/[ةہۃھ]/g, "ه");
 
   /* ---------- configuration: URL parameters win, then saved settings ---------- */
   const qs = new URLSearchParams(location.search);
   if (window.GQ_QS) new URLSearchParams(window.GQ_QS).forEach((v, k) => { if (!qs.has(k)) qs.append(k, v); });   // parameters handed over by a server-side wrapper (the old PHP "upload-auto" proxy)
   const EMBED = qs.get("embed") === "1";
   const mem = {};
+  /* The browser's (phone's) first language, when the reader cannot give all of it: told once per device and language, so the next one to add can be chosen.
+     A count only, with no account or identifier (privacy page). Only our website, the embeds it serves and our apps: never another copy of the reader, and
+     never when Do Not Track / Global Privacy Control is on or statistics were refused. */
+  function countMissingLanguage() {
+    const app = window.GQ_APP && typeof window.GQ_APP === "object" ? window.GQ_APP : null;
+    if (!(/^(www\.)?globalquran\.com$/i.test(location.hostname) || (app && (app.native || app.electron)) || window.GQ_COUNT_LANG)) return;
+    const m = GQL.missing(); if (!m || navigator.webdriver || navigator.globalPrivacyControl === true || navigator.doNotTrack === "1") return;
+    try {
+      if (localStorage.getItem("gq2.consent") === "denied" || localStorage.getItem("gq2.miss") === m.lang) return;
+      const server = String(window.GQ_AUTH_URL || "https://api-login.globalquran.com").replace(/\/+$/, "");
+      fetch(server + "/api/gq/language", { method: "POST", credentials: "omit", keepalive: true, headers: { "Content-Type": "text/plain" },
+        body: JSON.stringify({ lang: m.lang, missing: m.missing, platform: EMBED ? "embed" : (app && app.platform) || "web" }) })
+        .then(r => { if (r.ok) localStorage.setItem("gq2.miss", m.lang); }).catch(() => {});
+    } catch (e) {}
+  }
   /* login.js listens to this to keep a signed-in reader's saved verses, place and settings in step across devices */
   const emit = k => { try { dispatchEvent(new CustomEvent("gq:store", { detail: { k } })); } catch (e) {} };
   /* an embed keeps nothing between visits except the visitor's own saved verses (never the look the host page chose) */
@@ -67,9 +91,9 @@
   function writeAddress(s, n) {
     if (EMBED || urlMode() === "off") return;
     try {
-      const sp = new URLSearchParams(location.search); ["surah", "ayah", "page"].forEach(k => sp.delete(k));   // the place now lives in the link itself; an old ?surah=&ayah= must not win on reload
+      const sp = new URLSearchParams(location.search); ["surah", "ayah", "page"].concat(urlMode() === "path" && GQL.prefix() ? ["lang"] : []).forEach(k => sp.delete(k));   // the place now lives in the link itself; an old ?surah=&ayah= must not win on reload
       const q = sp.toString() ? "?" + sp.toString() : "";
-      history.replaceState(null, "", location.origin + (urlMode() === "path" ? baseFolder() + s + ":" + n + q : (new URL(document.baseURI).origin === location.origin ? DOCBASE : location.pathname) + q + "#" + s + ":" + n));
+      history.replaceState(null, "", location.origin + (urlMode() === "path" ? baseFolder() + GQL.prefix() + s + ":" + n + q : (new URL(document.baseURI).origin === location.origin ? DOCBASE : location.pathname) + q + "#" + s + ":" + n));
     } catch (e) {}
   }
   /* Mushaf glyph data and page fonts are hosted in the Cloudflare R2 assets bucket behind cdn.globalquran.com: {ASSETS}/quran_data/qcf/<surah>.json and {ASSETS}/fonts/qcf/... (the five small fonts in app.css are local). Override with window.GQ_ASSETS. */
@@ -86,7 +110,9 @@
     let r = null;
     if (+qs.get("surah")) r = { s: +qs.get("surah"), a: +qs.get("ayah") || 1, eds: [] };
     if (+qs.get("page") && !r) r = { page: +qs.get("page"), eds: [] };   // old "?page=" links
-    r = r || parseRoute(dec(location.pathname.slice(baseFolder().length)).replace(/^index\.html$/i, "")) || parseRoute(dec(location.hash.slice(1)));
+    let rel = dec(location.pathname.slice(baseFolder().length)).replace(/^index\.html$/i, "");
+    if (GQL.pathLang()) rel = rel.replace(/^[a-z]{2,3}(\/|$)/i, "");   // "ur/2:255": the language is read by i18n.js
+    r = r || parseRoute(GQL.asc(rel)) || parseRoute(GQL.asc(dec(location.hash.slice(1))));
     return r || { eds: [] };
   }
   let PAGES = null;   // first ayah of each of the 604 Madani pages: data/pages.json
@@ -95,7 +121,7 @@
   /* ---------- state ---------- */
   const hadTr = qs.get("trs") ?? store.get("trs") ?? qs.get("tr") ?? store.get("tr");   // null = first visit: choose by browser language
   const trParse = v => String(v ?? "").split(",").map(x => x.trim()).filter(Boolean);
-  const S = { last: ["read", "verse"].includes(pref("lastview", "verse")) ? pref("lastview", "verse") : "verse", view: ["read", "listen"].includes(pref("view", "verse")) ? pref("view", "verse") : "verse", rd: pref("rd", "ar") === "tr" ? "tr" : "ar", rdTr: pref("rdtr", ""), data: null, ar: [], trList: [], tlList: [], trCache: {}, tlCache: {}, qcf: {}, s: 1, cur: 1, sel: 0, trs: trParse(pref("trs", pref("tr", "en.hilali"))), theme: pref("theme", "day"), offs: [], count: 0 };
+  const S = { last: ["read", "verse"].includes(pref("lastview", "verse")) ? pref("lastview", "verse") : "verse", view: ["read", "listen"].includes(pref("view", "verse")) ? pref("view", "verse") : "verse", rd: pref("rd", "ar") === "tr" ? "tr" : "ar", rdTr: pref("rdtr", ""), data: null, ar: [], trList: [], tlList: [], trCache: {}, tlCache: {}, qcf: {}, s: 1, cur: 1, sel: 0, trs: trParse(pref("trs", pref("tr", "en.sahih"))), theme: pref("theme", "day"), offs: [], count: 0 };
   let bms = []; try { bms = JSON.parse(store.get("bm") || "[]"); } catch (e) {}
   const meta = n => S.data.surahs[n - 1];
   /* plain Arabic text comes from the API (quran-uthmani), one surah at a time; if the API is unreachable the words of the glyph data stand in */
@@ -125,7 +151,7 @@
   const trInfos = () => readTr() ? [S.trList.find(t => t.id === S.rdTr)].filter(Boolean) : S.trs.map(id => S.trList.find(t => t.id === id)).filter(Boolean);
   const trReady = (id, s) => !!(S.trCache[id] && S.trCache[id][s - 1]);
   const trAt = (id, s, n) => (S.trCache[id] && S.trCache[id][s - 1] && S.trCache[id][s - 1][n - 1]) || "";
-  const trBlocks = (s, n) => { const ts = trInfos(), multi = ts.length > 1; return ts.filter(t => trReady(t.id, s)).map(t => `<div class="tr${t.dir === "rtl" ? " rtl" : ""}" lang="${esc(t.lang)}"><span class="tt">${S.view === "read" ? `<span class="vnum">${n}</span>` : ""}${esc(trAt(t.id, s, n))}</span><cite>— ${esc(multi ? t.label : t.credit)}</cite></div>`).join(""); };
+  const trBlocks = (s, n) => { const ts = trInfos(), multi = ts.length > 1; return ts.filter(t => trReady(t.id, s)).map(t => `<div class="tr${t.dir === "rtl" ? " rtl" : ""}" lang="${esc(t.lang)}"><span class="tt">${S.view === "read" ? `<span class="vnum">${N(n)}</span>` : ""}${esc(trAt(t.id, s, n))}</span><cite>— ${esc(multi ? t.label : t.credit)}</cite></div>`).join(""); };
   const innerCls = () => S.view === "read" ? "inner reading" + (readTr() && (trInfos()[0] || {}).dir === "rtl" ? " rd-rtl" : "") : "inner layout-" + layoutPref;
   const trTexts = (s, n) => trInfos().filter(t => trReady(t.id, s)).map(t => trAt(t.id, s, n));
   const arabicHtml = (s, n, text) => esc(text);
@@ -139,7 +165,7 @@
   const TJ_FONTS = ["mushaf", "amiri", "kfc"], tjOk = f => f === "mushaf" ? COLR : TJ_FONTS.includes(f);
   let FONT = ["mushaf", "amiri", "kfc", "me"].includes(fontPref) ? fontPref : "mushaf";
   const TJ = { want: store.get("tajweed") !== "0", on: store.get("tajweed") !== "0" && tjOk(FONT), data: [],   // tajweed is on by default
-    rules: [["n", "Natural madd · 2"], ["p", "Permissible madd · 2/4/6"], ["o", "Obligatory madd · 4–5"], ["m", "Necessary madd · 6"], ["g", "Ghunnah"], ["q", "Qalqalah"], ["f", "Ikhfa"], ["c", "Ikhfa shafawi"], ["a", "Idgham with ghunnah"], ["u", "Idgham without ghunnah"], ["w", "Idgham shafawi"], ["i", "Iqlab"], ["d", "Idgham mutajanisayn"], ["b", "Idgham mutaqaribayn"], ["h", "Hamzat wasl"], ["l", "Lam shamsiyyah"], ["s", "Silent letter"]] };
+    rules: [["n", T("Natural madd · 2")], ["p", T("Permissible madd · 2/4/6")], ["o", T("Obligatory madd · 4–5")], ["m", T("Necessary madd · 6")], ["g", T("Ghunnah")], ["q", T("Qalqalah")], ["f", T("Ikhfa")], ["c", T("Ikhfa shafawi")], ["a", T("Idgham with ghunnah")], ["u", T("Idgham without ghunnah")], ["w", T("Idgham shafawi")], ["i", T("Iqlab")], ["d", T("Idgham mutajanisayn")], ["b", T("Idgham mutaqaribayn")], ["h", T("Hamzat wasl")], ["l", T("Lam shamsiyyah")], ["s", T("Silent letter")]] };
   function tajweedHtml(raw) {
     let out = "", depth = 0;
     for (let i = 0; i < raw.length; i++) {
@@ -154,7 +180,7 @@
   /* word by word (meaning on hover / tap) is off by default; switched on in the sidebar Settings */
   const WBW = { on: store.get("wbw") === "1" };
   function syncWbw() { root.classList.toggle("wbw-on", WBW.on); $("#optWbw").checked = WBW.on; if (!WBW.on) hideWordTip(); }
-  const TL = { on: store.get("tlit") !== "0", id: store.get("tlid") || "" };   // on by default so people discover it; easy to switch off
+  const TL = { on: pref("tlit", GQL.lang === "ar" ? "0" : "1") !== "0", id: store.get("tlid") || "" };   // on by default so people discover it; easy to switch off (Arabic readers need no Latin letters: off)
   const tlText = (s, n) => {
     const a = S.tlCache[TL.id]; if (a && a[s - 1] && a[s - 1][n - 1] != null) return a[s - 1][n - 1];
     return /^en\./.test(TL.id) && S.qcf[s] ? S.qcf[s][n - 1].filter(w => !w[5]).map(w => w[3] || "").join(" ") : "";   // English fallback from the glyph data
@@ -172,10 +198,10 @@
   async function setTlit(on) { stat("setting_change", { setting: "transliteration", value: on ? TL.id : "off" }); TL.on = on; store.set("tlit", on ? "1" : "0"); if (on) await loadTl(S.s); fillTlit(); requestAnimationFrame(recalc); refreshSaved(); }
   function buildTlitSelect() {
     const sel = $("#selTlit");
-    sel.innerHTML = `<option value="">Off</option>` + S.tlList.map(x => `<option value="${esc(x.id)}">${esc(langNames(x.lang).nat)}</option>`).join(""); sel.value = TL.on ? TL.id : "";
+    sel.innerHTML = `<option value="">${esc(T("Off"))}</option>` + S.tlList.map(x => `<option value="${esc(x.id)}">${esc(langNames(x.lang).nat)}</option>`).join(""); sel.value = TL.on ? TL.id : "";
   }
   $("#selTlit").onchange = async e => { const v = e.target.value; if (!v) return setTlit(false); TL.id = v; store.set("tlid", v); await setTlit(true); fillTlit(); };
-  const numHtml = n => `<span class="num" data-n="${n}">${BR.replace("%", n)}</span>`;
+  const numHtml = n => `<span class="num" data-n="${n}">${BR.replace("%", N(n))}</span>`;
   const arHtml = (s, n, text) => (TJ.on && TJ.data[s - 1] && TJ.data[s - 1][n - 1]) ? tajweedHtml(TJ.data[s - 1][n - 1]) : arabicHtml(s, n, text);
 
   /* mushaf glyph font (Quran.com's QCF), the default. One glyph per word from that word's page font, real words kept underneath,
@@ -195,7 +221,7 @@
   const bismHtml = () => qcfOn(1) && QC.on ? qcfWords(1, 1, 0, 4) : (TJ.on && TJ.data[0] && TJ.data[0][0]) ? tajweedHtml(TJ.data[0][0].split(" ").slice(0, 4).join(" ")) : esc(S.data.bismillah);
   async function loadQcf(s) {
     if (S.qcf[s]) return;
-    try { S.qcf[s] = await (await fetch(`${ASSETS}/quran_data/qcf/${s}.json`)).json(); } catch (e) { toast("Couldn't load the mushaf font data"); }
+    try { S.qcf[s] = await (await fetch(`${ASSETS}/quran_data/qcf/${s}.json`)).json(); } catch (e) { toast(T("Couldn't load the mushaf font data")); }
   }
   /* page fonts are registered on demand, a few pages at a time (see "lazy glyphs" below) */
   const qStyle = document.head.appendChild(document.createElement("style"));
@@ -292,8 +318,8 @@
     el.style.fontSize = "100px"; const r = el.getBoundingClientRect(); if (!r.width) return;
     el.style.fontSize = Math.min(100 * btn.clientWidth * .9 / r.width, 100 * cart.clientHeight * .74 / r.height, 70) + "px";
   }
-  const ayahHtml = (s, n, text) => `<div class="ayah" id="a${n}" data-n="${n}" role="group" aria-label="Verse ${n}"><div class="ar${qcfOn(s) ? " tmp" : ""}" lang="ar" data-m="${qcfOn(s) ? "q" : "t"}">${arLine(s, n, text)}</div><div class="tlit"></div><div class="trs"></div>
-      <div class="actions"><button data-act="play"><svg><use href="img/sprite.svg#i-play"/></svg>Play from here</button><button data-act="mark" aria-pressed="false"><svg><use href="img/sprite.svg#i-star"/></svg>Save</button><button data-act="copy"><svg><use href="img/sprite.svg#i-copy"/></svg>Copy</button><button data-act="share"><svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 11.5L13.5 5v3.5C8 9 4.8 12.4 3.8 18.8c2.6-3.3 5.8-4.6 9.7-4.6v3.5z"/></svg>Share</button></div></div>`;
+  const ayahHtml = (s, n, text) => `<div class="ayah" id="a${n}" data-n="${n}" role="group" aria-label="${esc(T("Verse {n}", { n }))}"><div class="ar${qcfOn(s) ? " tmp" : ""}" lang="ar" data-m="${qcfOn(s) ? "q" : "t"}">${arLine(s, n, text)}</div><div class="tlit"></div><div class="trs"></div>
+      <div class="actions"><button data-act="play"><svg><use href="img/sprite.svg#i-play"/></svg>${esc(T("Play from here"))}</button><button data-act="mark" aria-pressed="false"><svg><use href="img/sprite.svg#i-star"/></svg>${esc(T("Save"))}</button><button data-act="copy"><svg><use href="img/sprite.svg#i-copy"/></svg>${esc(T("Copy"))}</button><button data-act="share"><svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 11.5L13.5 5v3.5C8 9 4.8 12.4 3.8 18.8c2.6-3.3 5.8-4.6 9.7-4.6v3.5z"/></svg>${esc(T("Share"))}</button></div></div>`;
 
   /* ---------- render a surah ---------- */
   function renderSurah(n) {
@@ -301,13 +327,13 @@
     S.s = n; S.count = m.c; S.sel = 0;
     const bism = (n !== 1 && n !== 9) ? `<div class="bism${qcfOn(1) ? " qcf" : ""}" lang="ar">${bismHtml()}</div>` : "";
     inner.innerHTML = `<div class="surah-head"><div class="s-cal" aria-hidden="true"><i></i><span class="sn">${pad3(n)}</span><i></i></div>
-      <p class="s-info"><b>${esc(m.en)}</b> · ${esc(m.me)} · ${m.t === "M" ? "Meccan" : "Medinan"} · ${m.c} verses · Juz ${m.j}</p></div>${bism}`
+      <p class="s-info">${[`<b>${esc(sName(m))}</b>`, esc(sMean(m)), esc(m.t === "M" ? T("Meccan") : T("Medinan")), esc(TN(m.c, "{n} verse", "{n} verses")), esc(T("Juz {n}", { n: m.j }))].filter(Boolean).join(" · ")}</p></div>${bism}`
       + ay.map((t, i) => ayahHtml(n, i + 1, t)).join(S.view === "read" ? " " : "")
-      + `<div class="end">${n < 114 ? `<button data-act="nextSurah">Next: ${esc(meta(n + 1).en)} ›</button>` : "End of the Qur'an"}</div>`;
+      + `<div class="end">${n < 114 ? `<button data-act="nextSurah">${esc(T("Next: {name}", { name: sName(meta(n + 1)) }))} <span class="fwd">›</span></button>` : esc(T("End of the Qur'an"))}</div>`;
     inner.className = innerCls();
     fillTranslations(); fillTlit(); markBookmarks();
-    $("#cartName").textContent = pad3(n); $("#cartName").setAttribute("aria-label", `Surah ${n}, ${m.en}`); $("#cartBtn").setAttribute("aria-label", `Surah ${n}, ${m.en}. Choose another surah`);
-    announce(`${m.en}, surah ${n}, ${m.c} verses`);
+    $("#cartName").textContent = pad3(n); $("#cartName").setAttribute("aria-label", T("Surah {n}, {name}", { n, name: sName(m) })); $("#cartBtn").setAttribute("aria-label", T("Surah {n}, {name}. Choose another surah", { n, name: sName(m) }));
+    announce([sName(m), T("Surah {n}", { n }), TN(m.c, "{n} verse", "{n} verses")].join(", "));
     $("#btnPrevS").disabled = n <= 1; $("#btnNextS").disabled = n >= 114;
     $$("#surahList button, #pickList button").forEach(b => { b.classList.toggle("cur", +b.dataset.s === n); +b.dataset.s === n ? b.setAttribute("aria-current", "true") : b.removeAttribute("aria-current"); });
     setTitle();
@@ -316,17 +342,17 @@
   const keyBtn = $("#btnKey"), keyBox = $("#tjKey");
   function showKey(v) { if (v) closePops(); keyBox.hidden = !v; keyBtn.setAttribute("aria-expanded", !!v); }
   keyBtn.onclick = () => showKey(keyBox.hidden); $("#btnKeyHide").onclick = () => { KEYHIDE = true; store.set("keyhide", "1"); syncTajweedUi(); }; $("#btnKeyX").onclick = () => showKey(false);
-  function syncTajweedUi() { const showStrip = TJ.on && !KEYHIDE; keyBtn.hidden = !showStrip; $("#btnKeyHide").hidden = !showStrip; if (!showStrip) showKey(false); if (typeof syncFoot === "function") syncFoot(); root.classList.toggle("tj-on", TJ.on); $("#optTajweed").checked = TJ.on; $("#btnTajweed").setAttribute("aria-pressed", TJ.on); $("#btnTajweed").textContent = !tjOk(FONT) ? "N/A" : TJ.on ? "On" : "Off";
-    const ok = tjOk(FONT); [$("#btnTajweed"), $("#optTajweed")].forEach(x => { x.disabled = !ok; x.title = ok ? "" : "Tajweed colours aren't available with this font"; }); $("#optTajweed").checked = TJ.on; }
+  function syncTajweedUi() { const showStrip = TJ.on && !KEYHIDE; keyBtn.hidden = !showStrip; $("#btnKeyHide").hidden = !showStrip; if (!showStrip) showKey(false); if (typeof syncFoot === "function") syncFoot(); root.classList.toggle("tj-on", TJ.on); $("#optTajweed").checked = TJ.on; $("#btnTajweed").setAttribute("aria-pressed", TJ.on); $("#btnTajweed").textContent = !tjOk(FONT) ? T("N/A") : TJ.on ? T("On") : T("Off");
+    const ok = tjOk(FONT); [$("#btnTajweed"), $("#optTajweed")].forEach(x => { x.disabled = !ok; x.title = ok ? "" : T("Tajweed colours aren't available with this font"); }); $("#optTajweed").checked = TJ.on; }
   /* API markup "[h:1[ٱ]" -> our "{hٱ}" runs (nested runs fine; stray brackets in the source text are dropped) */
   const convertTj = t => String(t).replace(/\[([a-z])(?::\d+)?\[/g, "{$1").replace(/\]/g, "}").replace(/\[/g, "");
   async function loadTajweed(s = S.s) {
     if (TJ.data[s - 1]) return;
-    try { const got = await GQ.text(s, ["quran-tajweed"]); if (got["quran-tajweed"]) TJ.data[s - 1] = got["quran-tajweed"].map(convertTj); } catch (e) { toast("Couldn't load tajweed. Check your connection."); }
+    try { const got = await GQ.text(s, ["quran-tajweed"]); if (got["quran-tajweed"]) TJ.data[s - 1] = got["quran-tajweed"].map(convertTj); } catch (e) { toast(T("Couldn't load tajweed. Check your connection.")); }
   }
   const loadTajweedFor = s => Promise.all([loadTajweed(s), loadTajweed(1)]);
   async function setTajweed(on) {
-    if (!tjOk(FONT)) { syncTajweedUi(); return toast(FONT === "mushaf" ? "This browser can't show the mushaf tajweed colours. Choose Amiri Quran or KFC Naskh for them." : "Tajweed colours aren't available with this font"); }
+    if (!tjOk(FONT)) { syncTajweedUi(); return toast(FONT === "mushaf" ? T("This browser can't show the mushaf tajweed colours. Choose Amiri Quran or KFC Naskh for them.") : T("Tajweed colours aren't available with this font")); }
     stat("setting_change", { setting: "tajweed", value: on ? "on" : "off" }); TJ.want = on; TJ.on = on; store.set("tajweed", on ? "1" : "0"); KEYHIDE = false; store.set("keyhide", "");   // any tajweed toggle brings the key back
     syncTajweedUi();
     if (on && !QC.on) await loadTajweedFor(S.s);
@@ -362,7 +388,7 @@
   function setTitle() {   // "2:255 Al-Baqarah · Global Quran": follows the reading place, or the ayah being played
     if (S.mode === "saved") return;
     const s = A.on ? A.s : S.s, n = A.on ? (A.n || 1) : (S.cur || 1), m = meta(s); if (!m) return;
-    document.title = `${s}:${n} ${m.en} · Global Quran`;
+    document.title = `${ref(s, n)} ${sName(m)} · Global Quran`;
   }
   function setCur(n) {
     if (n === S.cur && S.curS === S.s) { moveHandle(); return; }
@@ -407,26 +433,26 @@
   const RB_PAD = 13;   // numbers and the handle stay fully inside the lighter track
   const rbTop = f => `calc(${RB_PAD}px + (100% - ${2 * RB_PAD}px) * ${f})`;
   function buildRibbonMarks() {
-    const H = track.clientHeight - 2 * RB_PAD, N = S.count; if (H <= 0 || !N) return;
-    const per = N > 1 ? H / (N - 1) : H, steps = [1, 2, 5, 10, 20, 25, 50, 100];
-    const step = steps.find(s => s * per >= 17) || 100;
-    const f = n => N > 1 ? (n - 1) / (N - 1) : .5;
+    const H = track.clientHeight - 2 * RB_PAD, C = S.count; if (H <= 0 || !C) return;
+    const per = C > 1 ? H / (C - 1) : H, steps = [1, 2, 5, 10, 20, 25, 50, 100];
+    const step = steps.find(s => s * per >= (GQL.native ? 20 : 17)) || 100;   // own digits are drawn a little larger, so they need more room
+    const f = n => C > 1 ? (n - 1) / (C - 1) : .5;
     let html = "";
     const minor = step === 1 ? 0 : step >= 10 ? step / 5 : 1;
-    if (minor && per * minor >= 3) for (let n = 1; n <= N; n++) if (n % step !== 0 && n % minor === 0) html += `<i style="top:${rbTop(f(n))}"></i>`;
-    const labels = new Set([1]); for (let n = step; n <= N; n += step) labels.add(n);
-    if (N - [...labels].pop() >= step * .6 || N === 1) labels.add(N);
-    labels.forEach(n => { html += `<span style="top:${rbTop(f(n))}">${n}</span>`; });
+    if (minor && per * minor >= 3) for (let n = 1; n <= C; n++) if (n % step !== 0 && n % minor === 0) html += `<i style="top:${rbTop(f(n))}"></i>`;
+    const labels = new Set([1]); for (let n = step; n <= C; n += step) labels.add(n);
+    if (C - [...labels].pop() >= step * .6 || C === 1) labels.add(C);
+    labels.forEach(n => { html += `<span style="top:${rbTop(f(n))}">${N(n)}</span>`; });
     rbMarks.innerHTML = html; moveHandle();
   }
   function moveHandle() {
-    const N = S.count || 1, frac = N > 1 ? (S.cur - 1) / (N - 1) : 0;
-    handle.style.top = (RB_PAD + frac * (track.clientHeight - 2 * RB_PAD)) + "px"; $("#rbNow").textContent = S.cur;
-    track.setAttribute("aria-valuenow", S.cur);
+    const C = S.count || 1, frac = C > 1 ? (S.cur - 1) / (C - 1) : 0;
+    handle.style.top = (RB_PAD + frac * (track.clientHeight - 2 * RB_PAD)) + "px"; $("#rbNow").textContent = N(S.cur);
+    track.setAttribute("aria-valuenow", S.cur); track.setAttribute("aria-valuetext", T("Ayah {n}", { n: S.cur }));
   }
   let drag = false;
   const ayahAt = e => { const r = track.getBoundingClientRect(), f = clamp((e.clientY - r.top - RB_PAD) / (r.height - 2 * RB_PAD), 0, 1); return { n: Math.round(f * (S.count - 1)) + 1, y: clamp(e.clientY - r.top, RB_PAD, r.height - RB_PAD), f }; };
-  function showTip(e) { const p = ayahAt(e), rb = $("#ribbon").getBoundingClientRect(), tr = track.getBoundingClientRect(); tip.hidden = false; tip.textContent = `Ayah ${p.n}`; tip.style.top = (tr.top - rb.top + p.y) + "px"; }
+  function showTip(e) { const p = ayahAt(e), rb = $("#ribbon").getBoundingClientRect(), tr = track.getBoundingClientRect(); tip.hidden = false; tip.textContent = T("Ayah {n}", { n: p.n }); tip.style.top = (tr.top - rb.top + p.y) + "px"; }
   track.addEventListener("pointerdown", e => { drag = true; track.setPointerCapture(e.pointerId); track.classList.add("drag"); stopSmooth(); const p = ayahAt(e); smoothToAyah(p.n, .18); showTip(e); e.preventDefault(); });
   track.addEventListener("pointermove", e => { if (drag) { const p = ayahAt(e); smoothToAyah(p.n, .22); } if (drag || e.pointerType === "mouse") showTip(e); });
   const endDrag = e => { if (!drag) return; drag = false; track.classList.remove("drag"); const p = ayahAt(e); smoothToAyah(p.n, .1); scheduleRealize(); const el = $("#a" + p.n, inner); if (el) { el.classList.remove("flash"); void el.offsetWidth; el.classList.add("flash"); } setTimeout(() => { if (!drag) tip.hidden = true; }, 500); };
@@ -487,11 +513,11 @@
   const closeVpop = () => { vpop.hidden = true; };
   function openVpop(anchor, ay) {
     const n = +ay.dataset.n, key = S.s + ":" + n, saved = bms.includes(key), ic = d => `<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
-    vpop.innerHTML = `<div class="vp-h">${esc(meta(S.s).en)} ${key}</div><div class="vp-b">
-      <button type="button" role="menuitem" data-act="play">${ic('<path d="M7 5l12 7-12 7z"/>')}Play</button>
-      <button type="button" role="menuitem" data-act="mark">${ic('<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/>')}${saved ? "Saved" : "Save"}</button>
-      <button type="button" role="menuitem" data-act="copy">${ic('<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/>')}Copy</button>
-      <button type="button" role="menuitem" data-act="share">${ic('<path d="M20.5 11.5L13.5 5v3.5C8 9 4.8 12.4 3.8 18.8c2.6-3.3 5.8-4.6 9.7-4.6v3.5z"/>')}Share</button></div>`;
+    vpop.innerHTML = `<div class="vp-h">${esc(sName(meta(S.s)))} ${N(key)}</div><div class="vp-b">
+      <button type="button" role="menuitem" data-act="play">${ic('<path d="M7 5l12 7-12 7z"/>')}${esc(T("Play"))}</button>
+      <button type="button" role="menuitem" data-act="mark">${ic('<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/>')}${esc(saved ? T("Saved") : T("Save"))}</button>
+      <button type="button" role="menuitem" data-act="copy">${ic('<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/>')}${esc(T("Copy"))}</button>
+      <button type="button" role="menuitem" data-act="share">${ic('<path d="M20.5 11.5L13.5 5v3.5C8 9 4.8 12.4 3.8 18.8c2.6-3.3 5.8-4.6 9.7-4.6v3.5z"/>')}${esc(T("Share"))}</button></div>`;
     vpop.hidden = false; vpop._ay = ay;
     const r = anchor.getBoundingClientRect(), W = vpop.offsetWidth, H = vpop.offsetHeight;
     vpop.style.left = clamp(r.left + r.width / 2 - W / 2, 8, innerWidth - W - 8) + "px";
@@ -534,11 +560,11 @@
     if (act === "nextSurah") return openSurah(S.s + 1, 1, { via: "end_button" });
     const n = +el.dataset.n, key = S.s + ":" + n; if (act !== "mark") stat("ayah_action", { action: act, surah: S.s, ayah: n, ref: key });   // which verses are played / copied / saved (no one's list, no identity)
     if (act === "play") { playAyah(n); selectAyah(n, S.view === "verse"); }
-    if (act === "mark") { const i = bms.indexOf(key); i < 0 ? bms.push(key) : bms.splice(i, 1); stat("ayah_action", { action: i < 0 ? "save" : "unsave", surah: S.s, ayah: n, ref: key }); store.set("bm", JSON.stringify(bms)); $("[data-act=mark]", el).setAttribute("aria-pressed", i < 0); drawMarks(); syncSavedUi(); toast(i < 0 ? "Saved" : "Removed"); if (i < 0) dispatchEvent(new CustomEvent("gq:saved", { detail: { key } })); }
+    if (act === "mark") { const i = bms.indexOf(key); i < 0 ? bms.push(key) : bms.splice(i, 1); stat("ayah_action", { action: i < 0 ? "save" : "unsave", surah: S.s, ayah: n, ref: key }); store.set("bm", JSON.stringify(bms)); $("[data-act=mark]", el).setAttribute("aria-pressed", i < 0); drawMarks(); syncSavedUi(); toast(i < 0 ? T("Saved") : T("Removed")); if (i < 0) dispatchEvent(new CustomEvent("gq:saved", { detail: { key } })); }
     if (act === "share") return shareAyah(S.s, n);
     if (act === "copy") {
-      const t = [arText(S.s, n), ...(TL.on ? [tlText(S.s, n)] : []), ...trTexts(S.s, n), `— ${meta(S.s).en} ${key}`].join("\n");
-      (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(() => toast("Copied"), () => toast("Couldn't copy"));
+      const t = [arText(S.s, n), ...(TL.on ? [tlText(S.s, n)] : []), ...trTexts(S.s, n), `— ${sName(meta(S.s))} ${N(key)}`].join("\n");
+      (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(() => toast(T("Copied")), () => toast(T("Couldn't copy")));
     }
   }
   /* ---------- share a verse: the phone's own share sheet where there is one, else a small menu ---------- */
@@ -554,33 +580,34 @@
     return p;
   }
   const verseLink = (s, n, p) => {
-    const q = p && Object.keys(p).length ? "?" + new URLSearchParams(p).toString() : "";
-    return location.origin + (urlMode() === "path" ? baseFolder() + s + ":" + n + q : (new URL(document.baseURI).origin === location.origin ? DOCBASE : location.pathname) + q + "#" + s + ":" + n);
+    const pre = urlMode() === "path" ? GQL.prefix() : "", all = Object.assign({}, p, !pre && GQL.ui !== "en" ? { lang: GQL.ui } : {});   // the link (and its preview) is in the sharer's language
+    const q = Object.keys(all).length ? "?" + new URLSearchParams(all).toString() : "";
+    return location.origin + (urlMode() === "path" ? baseFolder() + pre + s + ":" + n + q : (new URL(document.baseURI).origin === location.origin ? DOCBASE : location.pathname) + q + "#" + s + ":" + n);
   };
-  const verseText = (s, n) => [arText(s, n), ...trTexts(s, n).slice(0, 1), `— ${meta(s).en} ${s}:${n}`].join("\n");
-  const shareEl = document.createElement("div"); shareEl.id = "shareMenu"; shareEl.hidden = true; shareEl.setAttribute("role", "dialog"); shareEl.setAttribute("aria-label", "Share this verse"); document.body.appendChild(shareEl);
+  const verseText = (s, n) => [arText(s, n), ...trTexts(s, n).slice(0, 1), `— ${sName(meta(s))} ${ref(s, n)}`].join("\n");
+  const shareEl = document.createElement("div"); shareEl.id = "shareMenu"; shareEl.hidden = true; shareEl.setAttribute("role", "dialog"); shareEl.setAttribute("aria-label", T("Share this verse")); document.body.appendChild(shareEl);
   const closeShare = () => { shareEl.hidden = true; };
   async function shareAyah(s, n) {
-    const sp = shareParams(), url = verseLink(s, n, sp), title = `${meta(s).en} ${s}:${n}`; let text = verseText(s, n);
+    const sp = shareParams(), url = verseLink(s, n, sp), title = `${sName(meta(s))} ${ref(s, n)}`; let text = verseText(s, n);
     if (sp.m === "listen") {   // the words of what is being heard: Arabic, translation, or both
       let tr = ""; if (sp.l !== "ar" && sp.t) { try { await loadTrs([sp.t], s); } catch (e) {} tr = trAt(sp.t, s, n); }
-      text = [...(sp.l !== "tr" ? [arText(s, n)] : []), ...(tr ? [tr] : []), `— ${meta(s).en} ${s}:${n}`].join("\n");
+      text = [...(sp.l !== "tr" ? [arText(s, n)] : []), ...(tr ? [tr] : []), `— ${title}`].join("\n");
     }
     stat("ayah_action", { action: "share", surah: s, ayah: n, ref: s + ":" + n, from: sp.m === "listen" ? "listen" : "page" });
-    if (sp.t && /^(www\.)?globalquran\.com$/i.test(location.hostname)) fetch(`${location.origin}/card/${s}-${n}.jpg?t=${encodeURIComponent(sp.t)}&m=${sp.m}${sp.m === "listen" && sp.r ? "&r=" + encodeURIComponent(sp.r) : ""}&warm=1`).catch(() => {});   // the share card starts drawing now, so the preview is ready when the link is opened
+    if (sp.t && /^(www\.)?globalquran\.com$/i.test(location.hostname)) fetch(`${location.origin}/card/${s}-${n}.jpg?t=${encodeURIComponent(sp.t)}&m=${sp.m}${sp.m === "listen" && sp.r ? "&r=" + encodeURIComponent(sp.r) : ""}${GQL.ui !== "en" ? "&hl=" + GQL.ui : ""}&warm=1`).catch(() => {});   // the share card starts drawing now, so the preview is ready when the link is opened
     if (navigator.share) { try { await navigator.share({ title, text, url }); return; } catch (e) { if (e && e.name === "AbortError") return; } }   // cancelled: nothing more to do
     const enc = encodeURIComponent, msg = text + "\n" + url, ic = (d, c) => `<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="${c || "currentColor"}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
     const rows = [
       ["WhatsApp", "https://wa.me/?text=" + enc(msg)], ["Telegram", `https://t.me/share/url?url=${enc(url)}&text=${enc(text)}`],
       ["X", `https://twitter.com/intent/tweet?text=${enc(text)}&url=${enc(url)}`], ["Facebook", "https://www.facebook.com/sharer/sharer.php?u=" + enc(url)],
-      ["Email", `mailto:?subject=${enc(title)}&body=${enc(msg)}`]];
-    shareEl.innerHTML = `<div class="sh-back" data-close="1"></div><div class="sh-card"><div class="sh-h"><b>Share ${esc(title)}</b><button type="button" class="pl-b" data-close="1" aria-label="Close">${ic('<path d="M6 6l12 12M18 6L6 18"/>')}</button></div>
+      [T("Email"), `mailto:?subject=${enc(title)}&body=${enc(msg)}`]];
+    shareEl.innerHTML = `<div class="sh-back" data-close="1"></div><div class="sh-card"><div class="sh-h"><b>${esc(T("Share {name}", { name: title }))}</b><button type="button" class="pl-b" data-close="1" aria-label="${esc(T("Close"))}">${ic('<path d="M6 6l12 12M18 6L6 18"/>')}</button></div>
       <blockquote lang="ar">${esc(arText(s, n))}</blockquote>
-      <div class="sh-grid">${rows.map(([n2, h]) => `<a href="${h}" target="_blank" rel="noopener noreferrer">${esc(n2)}</a>`).join("")}<button type="button" data-copy="link">Copy link</button><button type="button" data-copy="text">Copy verse</button></div></div>`;
+      <div class="sh-grid">${rows.map(([n2, h]) => `<a href="${h}" target="_blank" rel="noopener noreferrer">${esc(n2)}</a>`).join("")}<button type="button" data-copy="link">${esc(T("Copy link"))}</button><button type="button" data-copy="text">${esc(T("Copy verse"))}</button></div></div>`;
     shareEl.hidden = false; const f = $("a", shareEl); f && f.focus();
     shareEl.onclick = e => {
       if (e.target.closest("[data-close]")) return closeShare();
-      const c = e.target.closest("[data-copy]"); if (c) { (navigator.clipboard ? navigator.clipboard.writeText(c.dataset.copy === "link" ? url : msg) : Promise.reject()).then(() => toast("Copied"), () => toast("Couldn't copy")); closeShare(); }
+      const c = e.target.closest("[data-copy]"); if (c) { (navigator.clipboard ? navigator.clipboard.writeText(c.dataset.copy === "link" ? url : msg) : Promise.reject()).then(() => toast(T("Copied")), () => toast(T("Couldn't copy"))); closeShare(); }
       else if (e.target.closest("a")) setTimeout(closeShare, 100);
     };
   }
@@ -618,21 +645,21 @@
      the action that failed (opening a surah, changing a translation) is undone and the reader returns exactly as it was.
      No people, animals or faces: a desert, a palm and the moon or sun. Preview any of them with ?oops=server|network|offline|timeout|rate|key. */
   const OOPS = {
-    offline: ["You're offline", "Global Quran can't reach the internet. Check your connection and try again. It will retry by itself when you're back online."],
-    network: ["We can't reach Global Quran", "The service isn't answering right now. This is usually brief: please try again in a moment."],
-    timeout: ["This is taking too long", "The service is slow to answer. Check your connection and try again."],
-    server: ["Something went wrong on our side", "The service is having trouble right now. Nothing you did caused this. Please try again in a moment."],
-    rate: ["Please slow down for a moment", "There were too many requests in a short time. Wait a minute, then try again."],
-    key: ["This isn't allowed from here", "The service refused the request. If you run this site, check the API key and the allowed domain."]
+    offline: [T("You're offline"), T("Global Quran can't reach the internet. Check your connection and try again. It will retry by itself when you're back online.")],
+    network: [T("We can't reach Global Quran"), T("The service isn't answering right now. This is usually brief: please try again in a moment.")],
+    timeout: [T("This is taking too long"), T("The service is slow to answer. Check your connection and try again.")],
+    server: [T("Something went wrong on our side"), T("The service is having trouble right now. Nothing you did caused this. Please try again in a moment.")],
+    rate: [T("Please slow down for a moment"), T("There were too many requests in a short time. Wait a minute, then try again.")],
+    key: [T("This isn't allowed from here"), T("The service refused the request. If you run this site, check the API key and the allowed domain.")]
   };
-  const KEY_REQUIRED = ["API key is required", "This page needs a Global Quran API key to show anything. If you run this site, get a free key at docs.globalquran.com and add it (on an embed: data-api-key)."];   // the API answered 401: a new site without a key (see rules/api.md)
+  const KEY_REQUIRED = [T("API key is required"), T("This page needs a Global Quran API key to show anything. If you run this site, get a free key at docs.globalquran.com and add it (on an embed: data-api-key).")];   // the API answered 401: a new site without a key (see rules/api.md)
   let downKind = "", downN = 0, listsDown = false;   // downN counts every time the screen is shown; listsDown: the screen is for the lists failing at start (opening a surah does not cure that)
   function down(e, o = {}) {
     downN++;
     const kind = OOPS[e && e.kind] ? e.kind : (navigator.onLine === false ? "offline" : "network"); downKind = kind;
     stat("error_screen", { kind, status: (e && e.status) || 0 });
     const t = kind === "key" && e && e.status === 401 ? KEY_REQUIRED : OOPS[kind]; $("#oopsT").textContent = t[0]; $("#oopsP").textContent = t[1];
-    $("#oopsD").textContent = [kind === "server" || kind === "key" || kind === "rate" ? "Error " + ((e && e.status) || "") : "", new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })].filter(Boolean).join(" · ").replace(/^Error \s*·/, "");
+    $("#oopsD").textContent = [e && e.status && ["server", "key", "rate"].includes(kind) ? T("Error {code}", { code: e.status }) : "", N(new Date().toLocaleTimeString(GQL.ui, { hour: "2-digit", minute: "2-digit" }))].filter(Boolean).join(" · ");
     $("#oopsBack").hidden = !((kind === "server" || kind === "offline") && S.undo);   // offline: the surah just tried is not saved, so going back to the one that was open is the way out
     try { stopAudio(); } catch (x) {}
     $("#oops").hidden = false; root.classList.add("down"); $("#oopsRetry").focus({ preventScroll: true });
@@ -650,7 +677,7 @@
   /* ---------- audio ---------- */
   /* Each ayah plays up to two voices in turn: the Quran reciter (optional), then a translation reciter (optional, "auto" follows the
      chosen translation's language). Neither chosen = the default Quran reciter, so something always plays. */
-  let RECITERS = [["ar.alafasy", "Mishary Alafasy", "Alafasy"]], TR_REC = [];   // [id, name, short] and [id, lang, name, -, short]; filled from /v2/list/recitor
+  let RECITERS = [["ar.alafasy", "Mishary Alafasy", "Alafasy"]], TR_REC = [];   // [id, name, short] and [id, lang, name, -, short, API default]; filled from /v2/list/recitor
   const REC_MEDIA = {};
   const voiceName = id => { const q = RECITERS.find(r => r[0] === id), r = TR_REC.find(x => x[0] === id); return q ? q[1] : r ? `${r[2]} (${r[1].toUpperCase()})` : id; };   // always Latin letters (the API short name for a translation voice is in its own script)
   const voiceNative = id => { const q = RECITERS.find(r => r[0] === id), r = TR_REC.find(x => x[0] === id), en = voiceName(id), nat = q ? q[2] : r ? r[4] : ""; return nat && nat.toLowerCase() !== en.toLowerCase().replace(/ \([a-z]{2,3}\)$/, "") && nat !== en ? nat : ""; };   // the voice's name in its own language and script, when it differs from the English one
@@ -658,7 +685,7 @@
   function setVoices(list) {
     const by = (x, y) => (x.id === "ar.alafasy" ? -1 : y.id === "ar.alafasy" ? 1 : x.full.localeCompare(y.full));
     RECITERS = list.filter(r => r.lang === "ar").sort(by).map(r => [r.id, r.full, r.name]);
-    TR_REC = list.filter(r => r.lang !== "ar").sort((x, y) => x.lang.localeCompare(y.lang) || x.full.localeCompare(y.full)).map(r => [r.id, r.lang, r.full, 0, r.name]);
+    TR_REC = list.filter(r => r.lang !== "ar").sort((x, y) => x.lang.localeCompare(y.lang) || x.full.localeCompare(y.full)).map(r => [r.id, r.lang, r.full, 0, r.name, r.def]);
     list.forEach(r => { REC_MEDIA[r.id] = r.media; });
     RECITERS = RECITERS.filter(r => audioVariants(r[0]).length); TR_REC = TR_REC.filter(r => audioVariants(r[0]).length);   // e.g. ogg-only reciters on a browser without Ogg
     if (A.reciter && !RECITERS.some(r => r[0] === A.reciter)) A.reciter = RECITERS.some(r => r[0] === "ar.alafasy") ? "ar.alafasy" : ((RECITERS[0] || [""])[0]);
@@ -684,9 +711,11 @@
   const audioFile = (id, ayahNo, vi = 0) => { const v = audioVariants(id)[vi] || audioVariant(id); return `https://audio.globalquran.com/${id}/${v.type}/${v.kbs}kbs/${ayahNo}.${v.type}`; };
   const audio = $("#audio"), A = { on: false, s: 1, n: 0, q: null, qi: 0, st: [], stage: 0, sim: 0, simT: 0, reciter: pref("reciter", "ar.alafasy"), trRec: pref("rtr", "auto"), speed: +pref("speed", 1), repeat: 0, times: 1, done: 0, rk: "", paused: false };
   const plBox = $("#player");
+  /* a language's usual translation voice: the one the API marks as default, else our pick (lang/languages.js) */
+  const usualVoice = l => (TR_REC.find(r => r[1] === l && r[5]) || TR_REC.find(r => r[0] === (GQL.LANGS[l] || {}).voice) || [])[0] || "";
   const trRecId = () => {   // which translation voice plays, if any
     if (A.trRec === "") return ""; if (A.trRec !== "auto") return A.trRec;
-    for (const t of trInfos()) { const r = TR_REC.find(x => x[1] === t.lang); if (r) return r[0]; } return "";
+    for (const t of trInfos()) { const r = usualVoice(t.lang) || (TR_REC.find(x => x[1] === t.lang) || [])[0]; if (r) return r; } return "";   // the language's usual voice first
   };
   const gAyah = (s, n) => meta(s).g + n - 1;
   const stageId = kind => kind === "ar" ? (A.reciter || "ar.alafasy") : trRecId();
@@ -705,26 +734,26 @@
   const arShort = () => (RECITERS.find(r => r[0] === (A.reciter || "ar.alafasy")) || RECITERS[0])[2];
   const trShort = () => { const r = TR_REC.find(x => x[0] === trRecId()); return r ? `${r[4]} (${r[1].toUpperCase()})` : ""; };
   const voiceText = () => stagesNow().map(k => k === "ar" ? arShort() : trShort()).join(" + ");
-  const voiceHtml = () => `<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c.6-3.6 3.4-5.6 7-5.6s6.4 2 7 5.6"/></svg><span class="vp-t">${esc(voiceText())}</span><i class="vp-s">${A.speed !== 1 ? A.speed + "×" : ""}</i>`;
+  const voiceHtml = () => `<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c.6-3.6 3.4-5.6 7-5.6s6.4 2 7 5.6"/></svg><span class="vp-t">${esc(voiceText())}</span><i class="vp-s">${A.speed !== 1 ? N(A.speed) + "×" : ""}</i>`;
   function syncVoiceBtn() {
     $("#plVoices").innerHTML = voiceHtml();
-    $("#plVoices").title = "Voices and speed: " + voiceText() + (A.speed !== 1 ? ", " + A.speed + "×" : "");
-    $("#vcSub").textContent = S.view !== "read" ? "Quran first, then translation" : S.rd === "ar" ? "Reading plays the Arabic" : "Reading plays this translation";
+    $("#plVoices").title = T("Voices and speed: {voices}", { voices: voiceText() + (A.speed !== 1 ? ", " + N(A.speed) + "×" : "") });
+    $("#vcSub").textContent = S.view !== "read" ? T("Quran first, then translation") : S.rd === "ar" ? T("Reading plays the Arabic") : T("Reading plays this translation");
   }
   /* the player lives inside the book and only appears while something is playing */
   const footRow = $("#footRow");
   function syncFoot() { $("#btnListen").hidden = A.on; footRow.hidden = A.on && (!TJ.on || KEYHIDE); }
-  function idleLabel() { $("#listenT").textContent = S.mode === "saved" ? "Play saved ayahs" : "Play from ayah " + (S.sel || S.cur || 1); }
+  function idleLabel() { $("#listenT").textContent = S.mode === "saved" ? T("Play saved ayahs") : T("Play from ayah {n}", { n: S.sel || S.cur || 1 }); }
   let plHide = false;   // Listen view: the bottom player is tucked away (audio keeps playing); tap the voice label on the stage to bring it back
   function showPlayer(v) { plBox.hidden = !v || (plHide && S.view === "listen"); if (!v) closePops(); syncFoot(); idleLabel(); }
   new ResizeObserver(() => root.style.setProperty("--foot", ($("#foot").offsetHeight + 10) + "px")).observe($("#foot"));
-  function setPlayIcon() { lsState(); $("#plPlay use").setAttribute("href", "img/sprite.svg#" + (A.on && !A.paused ? "i-pause" : "i-play")); $("#plPlay").setAttribute("aria-label", A.on && !A.paused ? "Pause" : "Play"); }
+  function setPlayIcon() { lsState(); $("#plPlay use").setAttribute("href", "img/sprite.svg#" + (A.on && !A.paused ? "i-pause" : "i-play")); $("#plPlay").setAttribute("aria-label", A.on && !A.paused ? T("Pause") : T("Play")); }
   function playingEl() { if (!A.on || A.n == null) return null; if (A.n === 0) return (!A.q && A.s === S.s) ? $(".bism", inner) : null; return A.q ? $(`#svinner .ayah[data-s="${A.s}"][data-n="${A.n}"]`) : (A.s === S.s ? $("#a" + A.n, inner) : null); }
   function markPlaying() { setTitle(); $$(".ayah.playing, .bism.playing").forEach(e => e.classList.remove("playing")); const el = playingEl(); if (el) el.classList.add("playing"); root.classList.toggle("playing-on", !!el); paintReading(); }
   function nowLabel(extra = "") {
-    const m = meta(A.s); $("#plSurah").textContent = `${m.n}. ${m.en}`;
-    const voice = A.st.length > 1 ? (A.st[A.stage] === "ar" ? " · Quran" : " · Translation") : (A.st[0] === "tr" ? " · Translation" : "");
-    const full = A.q ? `Saved ${A.s}:${A.n} · ${A.qi + 1} of ${A.q.length}` : A.n === 0 ? "Bismillah" : `Ayah ${A.n} of ${m.c}`, short = A.q ? `${A.qi + 1}/${A.q.length}` : A.n === 0 ? "Bismillah" : `${A.n}/${m.c}`;
+    const m = meta(A.s); $("#plSurah").textContent = `${N(m.n)}. ${sName(m)}`;
+    const voice = A.st.length > 1 ? " · " + (A.st[A.stage] === "ar" ? T("Quran") : T("Translation")) : (A.st[0] === "tr" ? " · " + T("Translation") : "");
+    const full = A.q ? T("Saved {ref} · {i} of {total}", { ref: ref(A.s, A.n), i: A.qi + 1, total: A.q.length }) : A.n === 0 ? T("Bismillah") : T("Ayah {n} of {total}", { n: A.n, total: m.c }), short = A.q ? N(`${A.qi + 1}/${A.q.length}`) : A.n === 0 ? T("Bismillah") : N(`${A.n}/${m.c}`);
     $("#plSub").innerHTML = `<span class="l-full">${esc(full)}</span><span class="l-short">${esc(short)}</span><span class="l-voice">${esc(voice + extra)}</span>`;
   }
   function playAyah(n, s = S.s, queue = null, qi = 0) {
@@ -744,8 +773,8 @@
     audio.play().then(() => $("#plPlay").classList.remove("loading")).catch(playFail);
   }
   /* a shared link tries to start the recitation by itself; browsers refuse sound until the page has been touched, so it waits, paused, for the first tap or key (not a silent timed preview) */
-  const tapLabel = on => { const sp = $(".ls-paused span"); if (sp) sp.textContent = on ? "Tap to listen" : "Paused"; };
-  function needTap() { $("#plPlay").classList.remove("loading"); A.paused = true; A.wait = true; setPlayIcon(); tapLabel(true); toast("Tap anywhere to start the recitation"); }
+  const tapLabel = on => { const sp = $(".ls-paused span"); if (sp) { sp.textContent = on ? T("Tap to listen") : T("Paused"); delete sp.dataset.idle; } };
+  function needTap() { $("#plPlay").classList.remove("loading"); A.paused = true; A.wait = true; setPlayIcon(); tapLabel(true); toast(T("Tap anywhere to start the recitation")); }
   /* the browser said "not allowed" (no touch on the page yet): wait for one, then play. Only click and key count, they are the events every browser accepts as a touch;
      a tap on the stage is used up by this (the stage's own tap would pause it again), and a failed try goes back to waiting, never to the silent timed preview. */
   const playFail = e => (e && e.name === "NotAllowedError") ? needTap() : simulate();
@@ -759,7 +788,7 @@
   }, true));
   function stageDone() { if (A.stage < A.st.length - 1) { A.stage++; startStage(); } else advance(); }
   function simulate() {   // offline / blocked audio: keep the interface working with a timed preview
-    $("#plPlay").classList.remove("loading"); A.sim = performance.now(); nowLabel(" · preview (audio unavailable)");
+    $("#plPlay").classList.remove("loading"); A.sim = performance.now(); nowLabel(" · " + T("preview (audio unavailable)"));
     const tick = () => { if (!A.on || A.paused || !A.sim) return; const f = (performance.now() - A.sim) / 3200; $("#plFill").style.width = Math.min(100, f * 100) + "%"; f >= 1 ? stageDone() : A.simT = setTimeout(tick, 120); };
     tick();
   }
@@ -807,20 +836,20 @@
   });
   audio.addEventListener("timeupdate", () => { if (A.on && audio.duration) $("#plFill").style.width = (audio.currentTime / audio.duration * 100) + "%"; });
   audio.addEventListener("playing", () => { $("#plPlay").classList.remove("loading"); A.gate = false; A.wait = false; tapLabel(false); });
-  $("#plPlay").onclick = togglePlay; $("#btnListen").onclick = togglePlay; $("#plClose").onclick = () => { if (S.view === "listen" && A.on && !plHide) { plHide = true; showPlayer(true); lsEl.classList.add("plhid"); $("#lsVoice").title = "Show player controls"; } else stopAudio(); };   // in Listen view the stage has its own controls: X only tucks the player away
+  $("#plPlay").onclick = togglePlay; $("#btnListen").onclick = togglePlay; $("#plClose").onclick = () => { if (S.view === "listen" && A.on && !plHide) { plHide = true; showPlayer(true); lsEl.classList.add("plhid"); $("#lsVoice").title = T("Show player controls"); } else stopAudio(); };   // in Listen view the stage has its own controls: X only tucks the player away
   $("#plEye").onclick = () => setView(S.view === "listen" ? (S.last || "verse") : "listen");   // flips between Listen and the reading view you last chose
   $("#plNext").onclick = () => skip(1); $("#plPrev").onclick = () => skip(-1);
   $("#plBar").onclick = e => { if (!A.on || A.sim || !audio.duration) return; const r = e.currentTarget.getBoundingClientRect(); audio.currentTime = clamp((e.clientX - r.left) / r.width, 0, 1) * audio.duration; };
-  function syncRepeatUi() { const b = $("#plRepeat"), x3 = A.times > 1; b.classList.toggle("on", A.repeat > 0 || x3); $("#rpBadge").textContent = x3 ? "×" + A.times : A.repeat === 1 ? "1" : A.repeat === 2 ? "∞" : ""; b.title = x3 ? `Repeat: each verse ${A.times} times` : "Repeat: " + ["off", "this ayah", "all"][A.repeat]; }
+  function syncRepeatUi() { const b = $("#plRepeat"), x3 = A.times > 1; b.classList.toggle("on", A.repeat > 0 || x3); $("#rpBadge").textContent = x3 ? "×" + N(A.times) : A.repeat === 1 ? N(1) : A.repeat === 2 ? "∞" : ""; b.title = x3 ? T("Repeat: each verse {n} times", { n: A.times }) : [T("Repeat: off"), T("Repeat: this ayah"), T("Repeat: all")][A.repeat]; }
   $("#plRepeat").onclick = () => { A.times = 1; A.repeat = (A.repeat + 1) % 3; syncRepeatUi(); toast($("#plRepeat").title); };
   function setReciter(id) { stat("setting_change", { setting: "quran_reciter", value: id }); A.reciter = id; store.set("reciter", id); syncReciters(); if (A.on && !A.paused) replay(); }
   function setTrRec(id) { stat("setting_change", { setting: "translation_reciter", value: id || "none" }); A.trRec = id; store.set("rtr", id); syncReciters(); if (A.on && !A.paused) replay(); }
   function setSpeed(v) { if (+v !== A.speed) stat("setting_change", { setting: "speed", value: String(v) }); A.speed = +v; if (typeof syncVoiceBtn === "function") syncVoiceBtn(); store.set("speed", v); audio.playbackRate = A.speed; $$("#plSpeedSeg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.v === String(v))); $("#optSpeed").value = v; }
-  const trAutoLabel = () => { const r = TR_REC.find(x => x[0] === (A.trRec === "auto" ? trRecId() : "")); return r ? `Auto: ${r[2]}` : "Auto (none for this language)"; };
+  const trAutoLabel = () => { const r = TR_REC.find(x => x[0] === (A.trRec === "auto" ? trRecId() : "")); return r ? T("Auto: {voice}", { voice: r[2] }) : T("Auto (none for this language)"); };
   function buildReciters() {
-    const ar = `<option value="">None (translation only)</option>` + RECITERS.map(([id, nm, nat]) => `<option value="${id}">${esc(voiceLabel(nm, nat))}</option>`).join("");
+    const ar = `<option value="">${esc(T("None (translation only)"))}</option>` + RECITERS.map(([id, nm, nat]) => `<option value="${id}">${esc(voiceLabel(nm, nat))}</option>`).join("");
     const langs = [...new Set(TR_REC.map(r => r[1]))];
-    const tr = `<option value="auto">${esc(trAutoLabel())}</option><option value="">None</option>` + langs.map(l => `<optgroup label="${esc(langNames(l).nat)}">` + TR_REC.filter(r => r[1] === l).map(r => `<option value="${r[0]}">${esc(voiceLabel(r[2], r[4]))}</option>`).join("") + `</optgroup>`).join("");
+    const tr = `<option value="auto">${esc(trAutoLabel())}</option><option value="">${esc(T("None"))}</option>` + langs.map(l => `<optgroup label="${esc(langNames(l).nat)}">` + TR_REC.filter(r => r[1] === l).map(r => `<option value="${r[0]}">${esc(voiceLabel(r[2], r[4]))}</option>`).join("") + `</optgroup>`).join("");
     [$("#plReciter"), $("#optReciter")].forEach(s => { s.innerHTML = ar; }); [$("#plTrRec"), $("#optTrRec")].forEach(s => { s.innerHTML = tr; });
     syncReciters(false);
   }
@@ -837,10 +866,10 @@
   /* ---------- saved ayahs: only the bookmarked ayahs, drawn with the current reading settings ---------- */
   const svscroll = $("#svscroll"), svinner = $("#svinner");
   const savedList = () => bms.map(k => k.split(":").map(Number)).sort((x, y) => x[0] - y[0] || x[1] - y[1]);
-  function syncSavedUi() { const b = $("#btnSaved"); b.setAttribute("aria-pressed", S.mode === "saved"); $("#bmCount").textContent = bms.length || ""; b.setAttribute("aria-label", `Saved ayahs (${bms.length})`); }
+  function syncSavedUi() { const b = $("#btnSaved"); b.setAttribute("aria-pressed", S.mode === "saved"); $("#bmCount").textContent = bms.length ? N(bms.length) : ""; b.setAttribute("aria-label", T("Saved ayahs ({n})", { n: bms.length })); }
   async function renderSaved() {
     const list = savedList(); svinner.className = "inner layout-" + layoutPref;
-    if (!list.length) { svinner.innerHTML = `<div class="sv-empty"><b>No saved ayahs yet</b><p>Tap an ayah, then choose Save.<br>Everything you save appears here, in your reading settings.</p></div>`; return; }
+    if (!list.length) { svinner.innerHTML = `<div class="sv-empty"><b>${esc(T("No saved ayahs yet"))}</b><p>${esc(T("Tap an ayah, then choose Save."))}<br>${esc(T("Everything you save appears here, in your reading settings."))}</p></div>`; return; }
     await Promise.all([...new Set(list.map(x => x[0]))].map(ensureTexts));
     if (QC.on) {
       await Promise.all([...new Set(list.map(x => x[0]))].map(loadQcf));
@@ -850,10 +879,10 @@
     let html = "", last = 0;
     list.forEach(([s, n]) => {
       const m = meta(s), q = QC.on && !!S.qcf[s];
-      if (s !== last) { last = s; const cnt = list.filter(x => x[0] === s).length; html += `<div class="sv-group"><b>${esc(m.en)}</b><span>${esc(m.me)} · ${cnt} saved</span></div>`; }
+      if (s !== last) { last = s; const cnt = list.filter(x => x[0] === s).length; html += `<div class="sv-group"><b>${esc(sName(m))}</b><span>${esc([sMean(m), T("{n} saved", { n: cnt })].filter(Boolean).join(" · "))}</span></div>`; }
       const ar = q ? qcfWords(s, n) : arHtml(s, n, arText(s, n)) + " " + numHtml(n);
       html += `<div class="ayah" data-s="${s}" data-n="${n}"><div class="ar${q ? " qcf" : ""}" lang="ar">${ar}</div><div class="tlit">${TL.on ? esc(tlText(s, n)) : ""}</div><div class="trs">${trBlocks(s, n)}</div>
-        <div class="actions"><button data-act="play"><svg><use href="img/sprite.svg#i-play"/></svg>Play</button><button data-act="unsave"><svg><use href="img/sprite.svg#i-star"/></svg>Remove</button><button data-act="open">Open in surah</button></div></div>`;
+        <div class="actions"><button data-act="play"><svg><use href="img/sprite.svg#i-play"/></svg>${esc(T("Play"))}</button><button data-act="unsave"><svg><use href="img/sprite.svg#i-star"/></svg>${esc(T("Remove"))}</button><button data-act="open">${esc(T("Open in surah"))}</button></div></div>`;
     });
     svinner.innerHTML = html; markPlaying();
   }
@@ -873,7 +902,7 @@
     if (act && el) {
       const s = +el.dataset.s, n = +el.dataset.n, a = act.dataset.act;
       if (a === "play") playSaved(savedList().findIndex(x => x[0] === s && x[1] === n));
-      if (a === "unsave") { const i = bms.indexOf(s + ":" + n); if (i >= 0) bms.splice(i, 1); store.set("bm", JSON.stringify(bms)); drawMarks(); markBookmarks(); syncSavedUi(); toast("Removed"); renderSaved(); }
+      if (a === "unsave") { const i = bms.indexOf(s + ":" + n); if (i >= 0) bms.splice(i, 1); store.set("bm", JSON.stringify(bms)); drawMarks(); markBookmarks(); syncSavedUi(); toast(T("Removed")); renderSaved(); }
       if (a === "open") { exitSaved(); openSurah(s, n); }
       return;
     }
@@ -901,19 +930,19 @@
   $("#btnMenu").onclick = toggleMenu; $("#scrim").onclick = closeMenu;
   $$(".side-tabs button").forEach(b => b.onclick = () => { $$(".side-tabs button").forEach(x => x.classList.toggle("on", x === b)); $$(".tab").forEach(t => t.classList.toggle("on", t.id === "tab-" + b.dataset.tab)); if (b.dataset.tab === "marks") drawMarks(); });
   function buildSurahList() {
-    $("#pickList").innerHTML = $("#surahList").innerHTML = S.data.surahs.map(m => `<li><button data-s="${m.n}" data-q="${esc((m.n + " " + m.en + " " + m.me + " " + m.ar).toLowerCase())}"><span class="s-no">${m.n}</span><span class="s-nm">${esc(m.en)}<small>${esc(m.me)} · ${m.c} verses</small></span><span class="s-ar sn" aria-hidden="true">${pad3(m.n)}</span></button>${window.GQOff ? GQOff.rowHtml(m.n) : ""}</li>`).join("");   // the offline status sits beside each surah (offline.js)
+    $("#pickList").innerHTML = $("#surahList").innerHTML = S.data.surahs.map(m => `<li><button data-s="${m.n}" data-q="${esc(fold([m.n, m.en, m.me, m.ar, arName(m)].join(" ")))}"><span class="s-no">${N(m.n)}</span><span class="s-nm">${esc(sName(m))}<small>${esc([sMean(m), TN(m.c, "{n} verse", "{n} verses")].filter(Boolean).join(" · "))}</small></span><span class="s-ar sn" aria-hidden="true">${pad3(m.n)}</span></button>${window.GQOff ? GQOff.rowHtml(m.n) : ""}</li>`).join("");   // the offline status sits beside each surah (offline.js)
     window.GQOff && GQOff.rows();
   }
   $("#surahList").addEventListener("click", e => { const b = e.target.closest("[data-s]"); if (b) openSurah(+b.dataset.s, 1, { via: "sidebar" }); });
   $("#surahFilter").addEventListener("input", e => {
-    const q = e.target.value.trim().toLowerCase().replace(/[-']/g, "");
-    $$("#surahList li").forEach(li => { const b = li.firstChild, t = (b.dataset.q || "").toLowerCase().replace(/[-']/g, ""); li.hidden = !!q && !t.includes(q); });
+    const q = fold(e.target.value.trim());
+    $$("#surahList li").forEach(li => { li.hidden = !!q && !(li.firstChild.dataset.q || "").includes(q); });
   });
   function drawMarks() {
     const list = $("#markList");
     list.innerHTML = bms.length ? bms.map(k => { const [s, n] = k.split(":").map(Number), m = meta(s), t = arText(s, n);
-      return `<li><button data-s="${s}" data-n="${n}"><span class="s-no">${n}</span><span class="s-nm">${esc(m.en)} · Ayah ${n}<small>${t ? esc(t.slice(0, 36)) + "…" : ""}</small></span></button></li>`; }).join("")
-      : `<li class="empty">No saved verses yet. Tap a verse, then Save.</li>`;
+      return `<li><button data-s="${s}" data-n="${n}"><span class="s-no">${N(n)}</span><span class="s-nm">${esc(sName(m))} · ${esc(T("Ayah {n}", { n }))}<small>${t ? esc(t.slice(0, 36)) + "…" : ""}</small></span></button></li>`; }).join("")
+      : `<li class="empty">${esc(T("No saved verses yet. Tap a verse, then Save."))}</li>`;
   }
   async function fillMarkSnippets() { const ss = [...new Set(bms.map(k => +k.split(":")[0]))].filter(s => !S.ar[s - 1]); if (!ss.length) return; await Promise.all(ss.map(loadAr)); drawMarks(); }
   $("#markList").addEventListener("click", e => { const b = e.target.closest("[data-s]"); if (b) openSurah(+b.dataset.s, +b.dataset.n); });
@@ -933,13 +962,14 @@
   $("#segRd").addEventListener("click", e => { const b = e.target.closest("[data-v]"); if (b && b.dataset.v !== S.rd) setRd(b.dataset.v); });
 
   /* ---------- on-page popovers: reading options + quick surah picker ---------- */
-  const POPS = { picker: [$("#picker"), $("#cartBtn")], trpick: [$("#trpick"), $("#trChip")], voices: [$("#voices"), $("#plVoices")], offline: [$("#offpop"), $("#btnOff")] };
+  const POPS = { picker: [$("#picker"), $("#cartBtn")], trpick: [$("#trpick"), $("#trChip")], voices: [$("#voices"), $("#plVoices")], offline: [$("#offpop"), $("#btnOff")], lang: [$("#langpop"), $("#btnLang")] };
   function closePops(except) { for (const k in POPS) { if (k === except) continue; const [p, b] = POPS[k]; p.hidden = true; b.setAttribute("aria-expanded", "false"); } }
   function togglePop(k) {
     const [p, b] = POPS[k], open = p.hidden; if (open) stat("open_panel", { panel: k }); closePops(open ? k : null); p.hidden = !open; b.setAttribute("aria-expanded", open);
     if (!open) return; showKey(false);
     if (k === "offline") window.GQOff && GQOff.renderPop();
     if (k === "trpick") openTrPick();
+    if (k === "lang") openLang();
     if (k === "picker") { const f = $("#pickFilter"); f.value = ""; $$("#pickList li").forEach(li => { li.hidden = false; }); const cur = $("#pickList button.cur"); cur && cur.scrollIntoView({ block: "center" }); if (matchMedia("(hover:hover)").matches) f.focus({ preventScroll: true }); }
   }
   const sub = $("#tools");
@@ -947,11 +977,11 @@
   new ResizeObserver(() => root.style.setProperty("--sh", sub.hidden ? "0px" : sub.offsetHeight + "px")).observe(sub);
   $("#btnTools").onclick = () => showTools(sub.hidden); $("#btnToolsX").onclick = () => showTools(false);
   $("#cartBtn").onclick = () => togglePop("picker"); $("#plVoices").onclick = () => togglePop("voices");
-  addEventListener("pointerdown", e => { if (!e.target.closest(".pop, #cartBtn, #trChip, #plVoices, #btnOff")) closePops(); });
+  addEventListener("pointerdown", e => { if (!e.target.closest(".pop, #cartBtn, #trChip, #plVoices, #btnOff, #btnLang, .lang-tab, #optLangBtn")) closePops(); });
   $("#pickList").addEventListener("click", e => { const b = e.target.closest("[data-s]"); if (b) { closePops(); openSurah(+b.dataset.s, 1, { via: "picker" }); } });
   $("#pickFilter").addEventListener("input", e => {
-    const q = e.target.value.trim().toLowerCase().replace(/[-']/g, "");
-    $$("#pickList li").forEach(li => { const b = li.firstChild, t = (b.dataset.q || "").toLowerCase().replace(/[-']/g, ""); li.hidden = !!q && !t.includes(q); });
+    const q = fold(e.target.value.trim());
+    $$("#pickList li").forEach(li => { li.hidden = !!q && !(li.firstChild.dataset.q || "").includes(q); });
   });
 
   /* ---------- translation + settings controls ---------- */
@@ -972,13 +1002,7 @@
   const toggleTr = id => setTranslations(S.trs.includes(id) ? S.trs.filter(x => x !== id) : [...S.trs, id]);
   function setSizes(ar, tr) { setVar("--fs-ar", ar); setVar("--fs-tr", tr); store.set("fsAr", ar); store.set("fsTr", tr); $("#optAr").value = ar; $("#optTrSize").value = tr; requestAnimationFrame(() => recalc()); }
   /* translations picker: search, "No translation" on top, chosen ones as chips, languages that open to their translators */
-  const enNames = (() => { try { return new Intl.DisplayNames(["en"], { type: "language" }); } catch (e) { return null; } })();
-  const langNames = code => {
-    let nat = code, en = code;
-    try { nat = new Intl.DisplayNames([code], { type: "language" }).of(code) || code; } catch (e) {}
-    try { en = (enNames && enNames.of(code)) || code; } catch (e) {}
-    return { nat: nat.charAt(0).toUpperCase() + nat.slice(1), en };
-  };
+  const langNames = GQL.names;   // a language's name in its own script and in English
   const TP = { open: new Set(), q: "", order: [] };
   function tpOrder() {   // chosen languages first, then A-Z; fixed while the list is open so rows don't jump
     const sel = new Set(S.view === "read" ? [S.rdTr] : S.trs), langs = [...new Set(S.trList.map(t => t.lang))].map(l => ({ l, en: langNames(l).en, on: S.trList.some(t => t.lang === l && sel.has(t.id)) }));
@@ -986,37 +1010,38 @@
   }
   function syncTrChip() {
     const ts = trInfos(), first = ts[0];
-    $("#trChipName").textContent = !first ? "No translation" : `${(first.lang || "").toUpperCase()} · ${first.label}` + (ts.length > 1 ? ` +${ts.length - 1}` : "");
-    $("#optTrBtn").textContent = !first ? "None" : first.label + (ts.length > 1 ? ` +${ts.length - 1}` : "");
+    $("#trChipName").textContent = !first ? T("No translation") : `${(first.lang || "").toUpperCase()} · ${first.label}` + (ts.length > 1 ? ` +${N(ts.length - 1)}` : "");
+    $("#optTrBtn").textContent = !first ? T("None") : first.label + (ts.length > 1 ? ` +${N(ts.length - 1)}` : "");
     renderTrList();
   }
   function renderTrList() {
     const body = $("#tpBody"), keep = body.scrollTop, q = TP.q.trim().toLowerCase(), ts = trInfos(), single = S.view === "read", sel = new Set(single ? [S.rdTr] : S.trs);
-    $("#tpNone").hidden = single; $("#tpNone").setAttribute("aria-checked", !ts.length);
-    $("#tpChosen").innerHTML = ts.length && !single ? `<span class="tc-l">Showing</span>` + ts.map(t => `<button class="chip" data-rm="${esc(t.id)}" title="Remove">${esc(t.label)} <i>✕</i></button>`).join("") : "";
+    $("#tpNone").hidden = single && !arabicUnderstand(); $("#tpNone").setAttribute("aria-checked", !ts.length);
+    $("#tpChosen").innerHTML = ts.length && !single ? `<span class="tc-l">${esc(T("Showing"))}</span>` + ts.map(t => `<button class="chip" data-rm="${esc(t.id)}" title="${esc(T("Remove"))}">${esc(t.label)} <i>✕</i></button>`).join("") : "";
     const order = TP.order.length ? TP.order : [...new Set(S.trList.map(t => t.lang))];
     let html = "";
     order.forEach(l => {
       const all = S.trList.filter(t => t.lang === l), nm = langNames(l), hit = q && [nm.nat, nm.en, l].some(x => x.toLowerCase().includes(q));
       const items = q && !hit ? all.filter(t => (t.label + " " + t.credit).toLowerCase().includes(q)) : all; if (!items.length) return;
       const nSel = all.filter(t => sel.has(t.id)).length, open = !!q || TP.open.has(l);
-      html += `<li class="tl"><button class="tl-h" data-l="${esc(l)}" aria-expanded="${open}"><span class="tl-n">${esc(nm.nat)}${nm.en !== nm.nat ? `<small>${esc(nm.en)}</small>` : ""}</span>${nSel ? `<span class="tl-sel">${nSel}</span>` : ""}<span class="tl-c">${all.length}</span><i>›</i></button>`
+      html += `<li class="tl"><button class="tl-h" data-l="${esc(l)}" aria-expanded="${open}"><span class="tl-n">${esc(nm.nat)}${nm.en !== nm.nat ? `<small>${esc(nm.en)}</small>` : ""}</span>${nSel ? `<span class="tl-sel">${N(nSel)}</span>` : ""}<span class="tl-c">${N(all.length)}</span><i>›</i></button>`
         + (open ? `<ul class="tl-items">` + items.map(t => `<li><button class="ti" role="${single ? "radio" : "checkbox"}" aria-checked="${sel.has(t.id)}" data-id="${esc(t.id)}"><span class="cb"></span><span class="ti-t">${esc(t.label)}<small>${esc(t.credit)}</small></span></button></li>`).join("") + `</ul>` : "") + `</li>`;
     });
-    $("#tpList").innerHTML = html || `<li class="tp-empty">Nothing matches “${esc(TP.q)}”.</li>`;
+    $("#tpList").innerHTML = html || `<li class="tp-empty">${esc(T("Nothing matches “{q}”.", { q: TP.q }))}</li>`;
     body.scrollTop = keep;
   }
   function buildTrList() {
-    $("#tpCount").textContent = `${S.trList.length} translations · ${new Set(S.trList.map(t => t.lang)).size} languages`;
+    $("#tpCount").textContent = `${TN(S.trList.length, "{n} translation", "{n} translations")} · ${TN(new Set(S.trList.map(t => t.lang)).size, "{n} language", "{n} languages")}`;
     tpOrder(); syncTrChip();
   }
   function openTrPick() { TP.q = ""; $("#tpFilter").value = ""; tpOrder(); renderTrList(); $("#tpBody").scrollTop = 0; if (matchMedia("(hover:hover)").matches) $("#tpFilter").focus({ preventScroll: true }); }
   $("#tpList").addEventListener("click", e => {
     const h = e.target.closest(".tl-h"); if (h) { const l = h.dataset.l; TP.open.has(l) ? TP.open.delete(l) : TP.open.add(l); renderTrList(); return; }
-    const b = e.target.closest(".ti"); if (b) { if (S.view === "read") { closePops(); setRdTr(b.dataset.id); } else toggleTr(b.dataset.id); }
+    const b = e.target.closest(".ti"); if (!b) return; if (S.view !== "read") return toggleTr(b.dataset.id);
+    closePops(); if (S.rd === "ar" && arabicUnderstand()) { S.rdTr = b.dataset.id; store.set("rdtr", S.rdTr); setRd("tr"); } else setRdTr(b.dataset.id);
   });
   $("#tpChosen").addEventListener("click", e => { const b = e.target.closest("[data-rm]"); if (b) toggleTr(b.dataset.rm); });
-  $("#tpNone").onclick = () => setTranslations([]);
+  $("#tpNone").onclick = () => { if (S.view !== "read") return setTranslations([]); closePops(); S.rdTr = ""; store.set("rdtr", ""); setRd("ar"); };   // in the book view the row only shows to an Arabic reader in Understand: back to the Arabic
   $("#tpFilter").addEventListener("input", e => { TP.q = e.target.value; renderTrList(); });
   $("#tpX").onclick = () => closePops();
   $("#optTrBtn").onclick = () => { closeMenu(); closePops(); showKey(false); const [p] = POPS.trpick; if (p.hidden) togglePop("trpick"); };
@@ -1039,41 +1064,41 @@
   function announce(msg) { clearTimeout(srT); srEl.textContent = ""; srT = setTimeout(() => { srEl.textContent = msg; }, 60); }   // polite screen-reader message
   const ARROW = d => `<svg viewBox="0 0 24 24" aria-hidden="true">${{ l: '<path d="M19 12H5M11 6l-6 6 6 6"/>', r: '<path d="M5 12h14M13 6l6 6-6 6"/>' }[d]}</svg>`;
   const cap = k => ({
-    left: `<kbd class="kc" aria-label="Left arrow">${ARROW("l")}</kbd>`, right: `<kbd class="kc" aria-label="Right arrow">${ARROW("r")}</kbd>`,
-    plus: `<kbd class="kc" aria-label="Plus">+</kbd>`, minus: `<kbd class="kc" aria-label="Minus">&minus;</kbd>`,
+    left: `<kbd class="kc" aria-label="${esc(T("Left arrow"))}">${ARROW("l")}</kbd>`, right: `<kbd class="kc" aria-label="${esc(T("Right arrow"))}">${ARROW("r")}</kbd>`,
+    plus: `<kbd class="kc" aria-label="${esc(T("Plus"))}">+</kbd>`, minus: `<kbd class="kc" aria-label="${esc(T("Minus"))}">&minus;</kbd>`,
     space: `<kbd class="kc kc-w">Space</kbd>`, shift: `<kbd class="kc kc-w">Shift</kbd>`, esc: `<kbd class="kc">Esc</kbd>`, home: `<kbd class="kc">Home</kbd>`, end: `<kbd class="kc">End</kbd>`
   }[k] || `<kbd class="kc">${esc(k.length === 1 ? k.toUpperCase() : k)}</kbd>`);
   /* [keys, ...]: each item is one way to do it; "a+b" is a combination, items are joined with "or" */
   const SHORTCUTS = [
-    ["Move around", [
-      [["left"], "Previous verse", "Goes to the verse before. If audio is on it plays that verse; in Listen view it shows it."],
-      [["right"], "Next verse", "Goes to the next verse. At the end of a surah it carries on into the next surah."],
-      [["shift+left", "["], "Previous surah", "Opens the surah before, at its first verse."],
-      [["shift+right", "]"], "Next surah", "Opens the surah after, at its first verse."],
-      [["home", "end"], "First and last verse", "Home jumps to the first verse of this surah, End to the last."],
-      [["g", "/"], "Go to a surah", "Opens the surah list so you can type a name or number."]]],
-    ["Listen", [
-      [["space", "k"], "Play or pause", "Plays from the verse you are on (with the Bismillah when you start at the top of a surah), or pauses and resumes."],
-      [["r"], "Repeat", "Cycles: off, repeat this verse, repeat the whole surah."],
-      [["s"], "Stop", "Stops the audio and closes the player."],
-      [["<", ">"], "Slower and faster", "Steps the speed through 0.75×, 1×, 1.25× and 1.5×."],
-      [["b"], "Save verse", "Adds the verse, or removes it, in your saved verses."],
-      [["c"], "Copy verse", "Copies the Arabic, the translation and the reference."]]],
-    ["View and settings", [
-      [["1", "2", "3"], "Choose the view", "1 is verse by verse, 2 is reading, 3 is Listen (one verse at a time)."],
-      [["m"], "Reading mode", "Opens the mode picker (Read, Understand, Listen, Memorise). Press it again, or Esc, to put it away."],
-      [["f"], "Focus and full screen", "Hides the menus and buttons so only the page is left, in the view you are using. Press again for full screen, again to go back. Esc steps back."],
-      [["t"], "Tajweed colours", "Turns the tajweed colouring on or off."],
-      [["d"], "Day or night", "Switches between the day and night look."],
-      [["plus", "minus"], "Text size", "Plus makes the Arabic and translation text larger, minus makes it smaller."]]],
-    ["Anywhere", [
-      [["?"], "Show this list", "Opens and closes the shortcuts."],
-      [["esc"], "Close", "Closes the open panel, menu or full screen."]]]
+    [T("Move around"), [
+      [["left"], T("Previous verse"), T("Goes to the verse before. If audio is on it plays that verse; in Listen view it shows it.")],
+      [["right"], T("Next verse"), T("Goes to the next verse. At the end of a surah it carries on into the next surah.")],
+      [["shift+left", "["], T("Previous surah"), T("Opens the surah before, at its first verse.")],
+      [["shift+right", "]"], T("Next surah"), T("Opens the surah after, at its first verse.")],
+      [["home", "end"], T("First and last verse"), T("Home jumps to the first verse of this surah, End to the last.")],
+      [["g", "/"], T("Go to a surah"), T("Opens the surah list so you can type a name or number.")]]],
+    [T("Listen"), [
+      [["space", "k"], T("Play or pause"), T("Plays from the verse you are on (with the Bismillah when you start at the top of a surah), or pauses and resumes.")],
+      [["r"], T("Repeat"), T("Cycles: off, repeat this verse, repeat the whole surah.")],
+      [["s"], T("Stop"), T("Stops the audio and closes the player.")],
+      [["<", ">"], T("Slower and faster"), T("Steps the speed through 0.75×, 1×, 1.25× and 1.5×.")],
+      [["b"], T("Save verse"), T("Adds the verse, or removes it, in your saved verses.")],
+      [["c"], T("Copy verse"), T("Copies the Arabic, the translation and the reference.")]]],
+    [T("View and settings"), [
+      [["1", "2", "3"], T("Choose the view"), T("1 is verse by verse, 2 is reading, 3 is Listen (one verse at a time).")],
+      [["m"], T("Reading mode"), T("Opens the mode picker (Read, Understand, Listen, Memorise). Press it again, or Esc, to put it away.")],
+      [["f"], T("Focus and full screen"), T("Hides the menus and buttons so only the page is left, in the view you are using. Press again for full screen, again to go back. Esc steps back.")],
+      [["t"], T("Tajweed colours"), T("Turns the tajweed colouring on or off.")],
+      [["d"], T("Day or night"), T("Switches between the day and night look.")],
+      [["plus", "minus"], T("Text size"), T("Plus makes the Arabic and translation text larger, minus makes it smaller.")]]],
+    [T("Anywhere"), [
+      [["?"], T("Show this list"), T("Opens and closes the shortcuts.")],
+      [["esc"], T("Close"), T("Closes the open panel, menu or full screen.")]]]
   ];
   const combo = s => s.split("+").map(cap).join('<span class="kbd-plus" aria-hidden="true">+</span>');
   function buildKbd() {
     $("#kbdBody").innerHTML = SHORTCUTS.map(([g, rows]) => `<div class="kbd-g" role="presentation">${esc(g)}</div>` + rows.map(([keys, t, d]) =>
-      `<div class="kbd-r"><div class="kbd-k">${keys.map(combo).join('<span class="kbd-or">or</span>')}</div><div class="kbd-t"><b>${esc(t)}</b><span>${esc(d)}</span></div></div>`).join("")).join("");
+      `<div class="kbd-r"><div class="kbd-k">${keys.map(combo).join(`<span class="kbd-or">${esc(T("or"))}</span>`)}</div><div class="kbd-t"><b>${esc(t)}</b><span>${esc(d)}</span></div></div>`).join("")).join("");
   }
   buildKbd();
   const kbdEl = $("#kbd"); let kbdFrom = null;
@@ -1092,7 +1117,7 @@
     n = clamp(n, 1, S.count); if (A.on) return playAyah(n, A.s);
     jumpAyah(n, { smooth: false, flash: S.view !== "listen" }); setCur(n);
     if (S.view === "listen") lsIdle(n); else if (S.sel !== n) selectAyah(n);
-    announce(`Verse ${n}`);
+    announce(T("Verse {n}", { n }));
   }
   function navVerse(d) {
     if (S.mode === "saved") return;
@@ -1103,11 +1128,11 @@
     goVerse(n);
   }
   const SPEEDS = [0.75, 1, 1.25, 1.5];
-  function stepSpeed(d) { const i = clamp(SPEEDS.indexOf(A.speed) + d, 0, SPEEDS.length - 1); setSpeed(SPEEDS[i]); toast(SPEEDS[i] + "× speed"); }
+  function stepSpeed(d) { const i = clamp(SPEEDS.indexOf(A.speed) + d, 0, SPEEDS.length - 1); setSpeed(SPEEDS[i]); toast(T("{x}× speed", { x: SPEEDS[i] })); }
   function onVerse() { const n = A.on ? A.n : (S.view === "listen" && LS.n ? LS.n : (S.sel || S.cur || 1)); return n > 0 && (!A.on || A.s === S.s) ? $("#a" + n, inner) : null; }
   addEventListener("keydown", e => {
     if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey || e.isComposing) return;
-    const t = e.target, k = e.key, key = k.length === 1 ? k.toLowerCase() : k;
+    const t = e.target, k = e.key, key = k.length === 1 ? GQL.asc(k.toLowerCase()) : k;
     if (t.closest && t.closest("input, select, textarea, [contenteditable=''], [contenteditable='true']")) { if (key !== "Escape" || (t.type === "search" && t.value)) return; t.blur(); }   // never take keys away from typing; Esc in an empty search box closes the panel it is in (a box with text is cleared by the browser first)
     const help = key === "?" || (key === "/" && e.shiftKey);   // "?" is Shift + / on most keyboards
     if (window.GQOff && GQOff.modalOpen()) return;   // the Offline library (and its small dialogs) handle their own keys
@@ -1128,14 +1153,14 @@
       case " ": if (onCtl) return; e.preventDefault(); togglePlay(); break;
       case "k": togglePlay(); break;
       case "r": $("#plRepeat").click(); break;
-      case "s": if (A.on) { stopAudio(); toast("Stopped"); } break;
+      case "s": if (A.on) { stopAudio(); toast(T("Stopped")); } break;
       case "<": case ",": stepSpeed(-1); break;
       case ">": case ".": stepSpeed(1); break;
       case "b": { const el = onVerse(); if (el) doAction("mark", el); break; }
       case "c": { const el = onVerse(); if (el) doAction("copy", el); break; }
-      case "1": if (S.view !== "verse") setView("verse"); announce("Verse by verse view"); break;
-      case "2": if (S.view !== "read") setView("read"); announce("Reading view"); break;
-      case "3": if (S.view !== "listen") setView("listen"); announce("Listen view"); break;
+      case "1": if (S.view !== "verse") setView("verse"); announce(T("Verse by verse view")); break;
+      case "2": if (S.view !== "read") setView("read"); announce(T("Reading view")); break;
+      case "3": if (S.view !== "listen") setView("listen"); announce(T("Listen view")); break;
       case "f": lsMode((lsStageNow() + 1) % 3); break;   // whatever view you are in: it is never changed
       case "m": if (modesOn()) putAwayModes(); else { showTools(false); showModes(true, true); } break;
       case "t": setTajweed(!TJ.on); break;
@@ -1153,6 +1178,7 @@
     if (d.type === "translation") setTranslations(Array.isArray(d.value) ? d.value : trParse(d.value));
     if (d.type === "tajweed") setTajweed(d.value !== false);
     if (d.type === "play") d.value === false ? stopAudio() : playAyah(+d.ayah || S.cur);
+    if (d.type === "language" && d.value !== GQL.lang) chooseLanguage(String(d.value));
   });
 
   /* ---------- lists from the Global Quran API ---------- */
@@ -1161,12 +1187,14 @@
     S.data.surahs.forEach(m => { const x = L[m.n]; if (!x) return; m.en = x.name_english || m.en; m.me = x.name_translation || m.me; m.c = x.ayahs || m.c; m.g = x.start_ayah || m.g; m.j = (x.juz && x.juz[0]) || m.j; m.t = x.revelation_type === "Medinan" ? "D" : "M"; });
   }
   const RTL = new Set(["ar", "fa", "ur", "ps", "sd", "ug", "ku", "dv", "he", "yi"]);   // the list has no text direction
-  const PREF_TR = { en: "en.sahih", ur: "ur.jalandhry", fr: "fr.hamidullah", id: "id.indonesian", tr: "tr.diyanet", fa: "fa.makarem", ru: "ru.kuliev", de: "de.bubenheim", es: "es.cortes", zh: "zh.jian", hi: "hi.hindi", bn: "bn.bengali", it: "it.piccardo", nl: "nl.keyzer", ms: "ms.basmeih", sq: "sq.ahmeti", sw: "sw.barwani", ta: "ta.tamil", th: "th.thai", pt: "pt.elhayek", pl: "pl.bielawskiego", sv: "sv.bernstrom", ro: "ro.grigore" };
   const mapTranslations = d => Object.entries(d.list || {}).filter(([id, v]) => v.format === "text" && v.type === "translation" && !id.startsWith("quran-"))
-    .map(([id, v]) => ({ id, lang: v.language_code, label: v.name || id, credit: v.english_name && v.english_name !== "Unknown" ? v.english_name : (v.name || id), dir: RTL.has(v.language_code) ? "rtl" : "ltr" }))
+    .map(([id, v]) => ({ id, lang: v.language_code, def: !!v.default, label: v.name || id, credit: v.english_name && v.english_name !== "Unknown" ? v.english_name : (v.name || id), dir: RTL.has(v.language_code) ? "rtl" : "ltr" }))
     .sort((a, b) => a.lang.localeCompare(b.lang) || a.label.localeCompare(b.label));
+  /* the player works verse by verse: a recording that only exists as whole surahs cannot play here, so it is not offered */
+  const byVerse = media => Object.fromEntries(Object.entries(media || {}).filter(([k, v]) => !/-surah$/.test(k) && !(v && v.mode === "surahbysurah")));
   const mapRecitors = d => Object.entries(d.list || {}).filter(([, v]) => v.format === "audio")
-    .map(([id, v]) => ({ id, lang: v.language_code, name: v.name || v.english_name || id, full: v.english_name || v.name || id, media: v.media || {} }));
+    .map(([id, v]) => ({ id, lang: v.language_code, def: !!v.default, name: v.name || v.english_name || id, full: v.english_name || v.name || id, media: byVerse(v.media) }))
+    .filter(r => Object.keys(r.media).length);
   const mapTlit = d => Object.entries(d.quranList || {}).filter(([, v]) => v.type === "transliteration").map(([id, v]) => ({ id, lang: v.language_code }));
   async function loadLists() {
     const out = { tr: [], tl: [{ id: "en.transliteration", lang: "en" }], rec: [{ id: "ar.alafasy", lang: "ar", name: "Alafasy", full: "Mishary Alafasy", media: { "mp3-128": { kbs: "128", type: "mp3", status: "active" } } }] };
@@ -1214,7 +1242,7 @@
     const tok = ++LS.tok; lsText.classList.add("out"); await sleep(LS.first ? 0 : 320);
     const [ar, tr] = await Promise.all([show !== "tr" ? lsArabicHtml(s, n) : null, show !== "ar" ? lsTrHtml(s, n) : ""]); if (tok !== LS.tok) return;
     LS.first = false;
-    $("#lsRef").textContent = n === 0 ? "Bismillah" : `${meta(s).en} · ${s}:${n}`;
+    $("#lsRef").textContent = n === 0 ? T("Bismillah") : `${sName(meta(s))} · ${ref(s, n)}`;
     const both = show === "both" && ar && tr;
     lsText.className = "ls-text out " + (both ? "show-both" : "show-" + show);
     lsText.innerHTML = (ar ? `<div class="ls-ar${ar.cls ? " " + ar.cls : ""}" lang="ar">${ar.html}</div>` : "") + (!ar || tr ? tr : "");
@@ -1229,7 +1257,7 @@
   function lsStage() {
     if (!lsVis()) return;
     lsEl.classList.remove("idle"); const kind = A.st[A.stage];
-    $("#lsVoiceT").textContent = kind === "ar" ? "Quran · " + arShort() : "Translation · " + trShort();
+    $("#lsVoiceT").textContent = kind === "ar" ? T("Quran") + " · " + arShort() : T("Translation") + " · " + trShort();
     lsShow(A.s, A.n, kind === "ar" ? "ar" : "tr"); lsState();
   }
   /* Listen has nothing to scroll, so the tabs cannot tuck away on scroll: they tuck while the recitation plays (the verse gets the room) and are back when it is paused or stopped.
@@ -1259,11 +1287,11 @@
     const playing = A.on && !A.paused; lsText.setAttribute("aria-live", A.on ? "off" : "polite");   // don't read the verse aloud over the recitation
     lsEl.classList.toggle("playing", playing); lsEl.classList.toggle("paused", A.on && A.paused); lsEl.classList.toggle("idle", !A.on);
     LS.speed = !A.on ? .3 : A.paused ? 0 : 1; if (lsVis()) lsKick();
-    { const sp = $(".ls-paused span"); if (sp) { if (!A.on) sp.textContent = "Tap to play"; else if (sp.textContent === "Tap to play") sp.textContent = "Paused"; } }
+    { const sp = $(".ls-paused span"); if (sp) { if (!A.on) { sp.textContent = T("Tap to play"); sp.dataset.idle = "1"; } else if (sp.dataset.idle) { sp.textContent = T("Paused"); delete sp.dataset.idle; } } }
     lsTabs(); lsWake();
   }
   function lsAfterOpen(ayah) { if (!lsVis()) return; LS.openAt = Date.now(); LS.key = ""; LS.first = true; A.on ? lsStage() : lsIdle(ayah || 1); }
-  $("#lsBg").onclick = () => { LS.bg = LS.bg % 4 + 1; store.set("lsbg", String(LS.bg)); lsDraw(0); lsKick(); toast(`Background ${LS.bg} of 4: ${LS_BG[LS.bg - 1]}`); };   // for choosing the default; the choice is remembered
+  $("#lsBg").onclick = () => { LS.bg = LS.bg % 4 + 1; store.set("lsbg", String(LS.bg)); lsDraw(0); lsKick(); toast(T("Background {n} of 4: {name}", { n: LS.bg, name: LS_BG[LS.bg - 1] })); };   // for choosing the default; the choice is remembered
   $("#lsShare").onclick = () => shareAyah(LS.s || S.s, Math.max(1, LS.n || S.cur || 1));   // shares what is on the stage, in the voices it is playing
   $("#lsVoice").onclick = e => { if (plHide) { e.stopPropagation(); }  if (plHide) { plHide = false; lsEl.classList.remove("plhid"); $("#lsVoice").title = ""; showPlayer(true); } };
   /* full screen: the stage fills the screen (real full screen where the browser allows it, otherwise it just covers the page); only the verse and the animation stay.
@@ -1279,9 +1307,9 @@
     if (cur === 0) { lsSideWas = app.classList.contains("side-off"); app.classList.add("side-off"); closePops(); }
     if (n === 0 && !lsSideWas) app.classList.remove("side-off");
     root.classList.toggle("ls-focus", n >= 1); root.classList.toggle("ls-full", n === 2); lsEl.classList.remove("reveal");
-    const lab = ["Focus view", "Full screen", "Exit full screen"][n]; [$("#lsFs"), $("#fsBtn")].forEach(b => { b.setAttribute("aria-label", lab); b.title = lab; });
+    const lab = [T("Focus view"), T("Full screen"), T("Exit full screen")][n]; [$("#lsFs"), $("#fsBtn")].forEach(b => { b.setAttribute("aria-label", lab); b.title = lab; });
     try { if (n === 2) { const r = document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen; r && r.call(document.documentElement); } else if (cur === 2 && document.fullscreenElement) document.exitFullscreen(); } catch (e) {}
-    setTimeout(() => { lsSize(); lsFit(); }, 60); announce(["Normal view", "Focus view", "Full screen"][n]); stat("setting_change", { setting: "listen_screen", value: ["normal", "focus", "full"][n] });
+    setTimeout(() => { lsSize(); lsFit(); }, 60); announce([T("Normal view"), T("Focus view"), T("Full screen")][n]); stat("setting_change", { setting: "listen_screen", value: ["normal", "focus", "full"][n] });
   }
   const lsFull = on => lsMode(on ? 2 : 0);
   $("#lsFs").onclick = e => { e.stopPropagation(); lsMode((lsStageNow() + 1) % 3); };
@@ -1335,7 +1363,7 @@
      1 Girih (the illuminated rings), 2 Ripples (rings of light spreading with the voice), 3 Night sky (stars drifting, a crescent, a glow on the horizon), 4 Aurora (soft
      drifting light and flowing ribbons). All of them: the same halo and calligraphic watermark, nothing above ~30% alpha, no six-pointed figure (stars are plain dots; rings
      and lobes come in 8-, 16- or 32-fold counts). They all breathe with LS.amp. */
-  const LS_BG = ["Girih", "Ripples", "Night sky", "Aurora"];
+  const LS_BG = [T("Girih"), T("Ripples"), T("Night sky"), T("Aurora")];
   function lsHalo(g, c, k) {   // the breathing halo, swelling with the voice
     const { w, h, cx, cy, R, ph, amp, night, col } = c, br = .5 + .5 * Math.sin(ph * .0012), hal = ((night ? .17 : .13) + br * .05 + amp * .3) * (k || 1);
     const gr = g.createRadialGradient(cx, cy, 0, cx, cy, R * (1.05 + amp * .25));
@@ -1488,15 +1516,15 @@
     memorise: '<path d="M17 3l3 3-3 3M4 11V9a3 3 0 0 1 3-3h13M7 21l-3-3 3-3M20 13v2a3 3 0 0 1-3 3H4"/>'
   };
   const MODES = [
-    { id: "read", name: "Read", hint: "On the page", subs: [
-      { id: "read_understand", name: "Read & understand", def: true, text: "The Arabic with its translation under every verse, one verse at a time. This is how the page opens." },
-      { id: "read", name: "Read", text: "Only the Arabic, in the Madani mushaf style with the tajweed colours, flowing like a printed page. Nothing else to look at." }] },
-    { id: "understand", name: "Understand", hint: "Translation first", text: "Reads like a book in your language: the translation flows as plain text, with the verse numbers. Switch the language from the line under the title." },
-    { id: "listen", name: "Listen", hint: "Hear the recitation", subs: [
-      { id: "listen_ar", name: "Recitation", text: "One verse at a time on a calm screen while it is recited in Arabic. Starts playing at once." },
-      { id: "listen_both", name: "Recitation with translation", text: "Each verse is recited in Arabic, then its translation is spoken, and the text on screen follows along." },
-      { id: "listen_tr", name: "Translation only", text: "Hear and see just the translation, verse by verse. If your language has no recording it plays the recitation." }] },
-    { id: "memorise", name: "Memorise", hint: "Repeat and learn", text: "One verse at a time in Arabic with the tajweed colours, each verse recited three times before the next. Starts playing at once." }
+    { id: "read", name: T("Read"), hint: T("On the page"), subs: [
+      { id: "read_understand", name: T("Read & understand"), def: true, text: T("The Arabic with its translation under every verse, one verse at a time. This is how the page opens.") },
+      { id: "read", name: T("Read"), text: T("Only the Arabic, in the Madani mushaf style with the tajweed colours, flowing like a printed page. Nothing else to look at.") }] },
+    { id: "understand", name: T("Understand"), hint: T("Translation first"), text: T("Reads like a book in your language: the translation flows as plain text, with the verse numbers. Switch the language from the line under the title.") },
+    { id: "listen", name: T("Listen"), hint: T("Hear the recitation"), subs: [
+      { id: "listen_ar", name: T("Recitation"), text: T("One verse at a time on a calm screen while it is recited in Arabic. Starts playing at once.") },
+      { id: "listen_both", name: T("Recitation with translation"), text: T("Each verse is recited in Arabic, then its translation is spoken, and the text on screen follows along.") },
+      { id: "listen_tr", name: T("Translation only"), text: T("Hear and see just the translation, verse by verse. If your language has no recording it plays the recitation.") }] },
+    { id: "memorise", name: T("Memorise"), hint: T("Repeat and learn"), text: T("One verse at a time in Arabic with the tajweed colours, each verse recited three times before the next. Starts playing at once.") }
   ];
   const modesEl = $("#modes"), mChips = $("#modesChips"), mSub = $("#modesSub");
   let mOpen = "";
@@ -1508,8 +1536,8 @@
     const m = MODES.find(x => x.id === mOpen), now = mCur();
     /* a mode with choices takes the whole note: the tiles and the intro go, the heading becomes the mode's name, "All modes" leads back */
     mChips.hidden = !!m; modesEl.classList.toggle("sub-open", !!m);
-    $("#modesT").textContent = m ? m.name : "How would you like to read today?";
-    mSub.hidden = !m; mSub.innerHTML = m ? `<button type="button" class="msub-back" data-back="1"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>All modes</button><p class="msub-h">Choose one. You can change any of it afterwards in the options.</p>` + m.subs.map(s => `<button type="button" class="msub${s.id === now ? " cur" : ""}" data-s="${s.id}"${s.id === now ? ' aria-current="true"' : ""}><svg viewBox="0 0 24 24" aria-hidden="true">${MICON[m.id]}</svg><b>${esc(s.name)}${s.def ? "<em>Default</em>" : ""}</b><span>${esc(s.text)}</span></button>`).join("") : "";
+    $("#modesT").textContent = m ? m.name : T("How would you like to read today?");
+    mSub.hidden = !m; mSub.innerHTML = m ? `<button type="button" class="msub-back" data-back="1"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>${esc(T("All modes"))}</button><p class="msub-h">${esc(T("Choose one. You can change any of it afterwards in the options."))}</p>` + m.subs.map(s => `<button type="button" class="msub${s.id === now ? " cur" : ""}" data-s="${s.id}"${s.id === now ? ' aria-current="true"' : ""}><svg viewBox="0 0 24 24" aria-hidden="true">${MICON[m.id]}</svg><b>${esc(s.name)}${s.def ? `<em>${esc(T("Default"))}</em>` : ""}</b><span>${esc(s.text)}</span></button>`).join("") : "";
   }
   function showModes(on, focus) {
     modesEl.hidden = !on; if (!on) { mOpen = ""; return; }
@@ -1518,22 +1546,26 @@
   }
   const modesOn = () => !modesEl.hidden;
   function putAwayModes() { store.set("modes", "1"); showModes(false); }
+  const arabicOnly = () => GQL.lang === "ar" && !S.trs.length;   // Arabic menus and no translation chosen
+  const arabicUnderstand = () => arabicOnly() && store.get("mode") === "understand";
   async function applyMode(id, opts = {}) {
     putAwayModes(); showTools(false); store.set("mode", id); stat("mode_select", { mode: id });
     const needTr = ["read_understand", "understand", "listen_both", "listen_tr"].includes(id);
-    if (needTr && !S.trs.length) await setTranslations([(S.trList.find(t => t.id === "en.sahih") || S.trList[0] || { id: "en.sahih" }).id]);
+    /* an Arabic reader has no translation (user's rule): Understand and the modes that add one under the Arabic leave it out; "Translation only" uses English */
+    if (needTr && !S.trs.length && !(GQL.lang === "ar" && ["read_understand", "understand", "listen_both"].includes(id))) await setTranslations([defaultTr()]);
+    const arOnly = id === "understand" && arabicOnly() && !store.get("rdtr");   // a translation the reader picked here comes back
     const rec = A.reciter || "ar.alafasy", voices = { listen_ar: [rec, ""], listen_both: [rec, "auto"], listen_tr: ["", "auto"], memorise: [rec, ""] }[id];
     if (voices) { A.reciter = voices[0]; store.set("reciter", A.reciter); A.trRec = voices[1]; if (voices[1] && opts.trRec) A.trRec = opts.trRec; store.set("rtr", A.trRec); }   // a shared link names its translation voice
     A.times = id === "memorise" ? 3 : 1; syncRepeatUi();
-    if ((id === "read" || id === "memorise") && !TJ.on && tjOk(FONT)) await setTajweed(true);
-    const view = { read: "read", read_understand: "verse", understand: "read" }[id] || "listen", show = id === "understand" ? "tr" : "ar";
+    if ((id === "read" || id === "memorise" || arOnly) && !TJ.on && tjOk(FONT)) await setTajweed(true);
+    const view = { read: "read", read_understand: "verse", understand: "read" }[id] || "listen", show = id === "understand" && !arOnly ? "tr" : "ar";
     S.view = view; S.rd = show; store.set("view", view); store.set("rd", show); if (view !== "listen") { S.last = view; store.set("lastview", view); }
-    if (!S.trList.some(t => t.id === S.rdTr)) S.rdTr = S.trs[0] || "en.sahih";
+    if (!S.trList.some(t => t.id === S.rdTr)) S.rdTr = S.trs[0] || defaultTr();
     if (readTr()) await loadTr(S.rdTr);
     syncView(); syncTrChip(); syncReciters(); await reRender();
     if (view === "listen") { if (opts.from) playAyah(opts.from); else if (A.on) replay(); else togglePlay(); }   // a shared link names the verse to start from
     drawTabs();
-    announce(`${(MODES.flatMap(m => m.subs || [m]).find(x => x.id === id) || {}).name} mode`);
+    announce(T("{name} mode", { name: (MODES.flatMap(m => m.subs || [m]).find(x => x.id === id) || {}).name }));
   }
   mChips.addEventListener("click", e => {
     const b = e.target.closest("[data-m]"); if (!b) return; const m = MODES.find(x => x.id === b.dataset.m);
@@ -1547,7 +1579,7 @@
   $(".brand").addEventListener("click", e => { if (EMBED) return; e.preventDefault(); openSurah(1, 1, { via: "home" }); showModes(true); });   // the logo is the way "home": the landing page and its note
 
   /* ---------- mode tabs on the book: Read, Understand, Listen, Memorise. Placement: top (default), side or none (then the options bar shows a Mode menu button) ---------- */
-  var mtNav = document.createElement("nav"); mtNav.className = "modetabs"; mtNav.id = "modeTabs"; mtNav.setAttribute("aria-label", "Reading mode"); $("#book").appendChild(mtNav);
+  var mtNav = document.createElement("nav"); mtNav.className = "modetabs"; mtNav.id = "modeTabs"; mtNav.setAttribute("aria-label", T("Reading mode")); $("#book").appendChild(mtNav);
   var mtMenu = document.createElement("div"); mtMenu.className = "mtmenu"; mtMenu.id = "mtMenu"; mtMenu.setAttribute("role", "menu"); mtMenu.hidden = true; $("#book").appendChild(mtMenu);
   let mtFrom = null, mtCur = "read";
   const TABSET = ["top", "side", "none"];
@@ -1559,8 +1591,8 @@
   }
   function drawTabs() {
     if (!mtNav) return; if (mtMenu && !mtMenu.hidden) mtClose(); root.classList.remove("mt-tuck"); lsTabs(true);   // a view or mode change brings the tabs back; in Listen they tuck again while it plays
-    const cur = mtCur = S.view === "listen" ? (A.times === 3 ? "memorise" : "listen") : S.view === "read" && S.rd === "tr" ? "understand" : "read";   // what the page is actually showing
-    mtNav.innerHTML = MODES.map(m => `<button type="button" class="mtab${m.id === cur ? " on" : ""}" data-m="${m.id}" ${m.subs ? 'aria-haspopup="menu" aria-expanded="false"' : `aria-pressed="${m.id === cur}"`} title="${esc(m.name)}${m.subs ? " (choose)" : ""}"><svg viewBox="0 0 24 24" aria-hidden="true">${MICON[m.id]}</svg><span>${esc(m.name)}</span>${m.subs ? '<svg class="mt-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5"/></svg>' : ""}</button>`).join("");
+    const cur = mtCur = S.view === "listen" ? (A.times === 3 ? "memorise" : "listen") : S.view === "read" && (S.rd === "tr" || (arabicOnly() && store.get("mode") === "understand")) ? "understand" : "read";   // what the page is actually showing (in Arabic, Understand and Read both show the Quran: the last choice tells them apart)
+    mtNav.innerHTML = MODES.map(m => `<button type="button" class="mtab${m.id === cur ? " on" : ""}" data-m="${m.id}" ${m.subs ? 'aria-haspopup="menu" aria-expanded="false"' : `aria-pressed="${m.id === cur}"`} title="${esc(m.subs ? T("{name} (choose)", { name: m.name }) : m.name)}"><svg viewBox="0 0 24 24" aria-hidden="true">${MICON[m.id]}</svg><span>${esc(m.name)}</span>${m.subs ? '<svg class="mt-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5"/></svg>' : ""}</button>`).join("");
   }
   /* a menu under a tab or under the Mode button; nothing changes until a choice is made */
   function mtClose(back) {
@@ -1571,24 +1603,24 @@
   function mtShow(b, html, side, cls) {
     mtMenu.className = "mtmenu" + (cls ? " " + cls : ""); mtMenu.innerHTML = html; mtMenu.hidden = false; mtFrom = b; b.setAttribute("aria-expanded", "true");
     const bk = $("#book").getBoundingClientRect(), r = b.getBoundingClientRect(), w = mtMenu.offsetWidth, h = mtMenu.offsetHeight;
-    let x = side ? r.right - bk.left + 8 : r.left - bk.left, y = side ? r.top - bk.top : r.bottom - bk.top + 6;
+    let x = side ? (GQL.rtl ? r.left - bk.left - w - 8 : r.right - bk.left + 8) : GQL.rtl ? r.right - bk.left - w : r.left - bk.left, y = side ? r.top - bk.top : r.bottom - bk.top + 6;
     x = Math.max(6, Math.min(x, bk.width - w - 6)); y = Math.max(6, Math.min(y, bk.height - h - 6)); mtMenu.style.left = x + "px"; mtMenu.style.top = y + "px";
     const f = mtMenu.querySelector(".mtm.cur") || mtMenu.querySelector(".mtm"); f && f.focus({ preventScroll: true });
   }
-  const mtItem = (id, name, text, cur, def) => `<button type="button" role="menuitem" class="mtm${cur ? " cur" : ""}" data-s="${id}" title="${esc(text)}"><b>${esc(name)}${def ? "<em>Default</em>" : ""}</b><span>${esc(text)}</span></button>`;
+  const mtItem = (id, name, text, cur, def) => `<button type="button" role="menuitem" class="mtm${cur ? " cur" : ""}" data-s="${id}" title="${esc(text)}"><b>${esc(name)}${def ? `<em>${esc(T("Default"))}</em>` : ""}</b><span>${esc(text)}</span></button>`;
   mtNav.addEventListener("click", e => {
     const b = e.target.closest(".mtab"); if (!b) return; const m = MODES.find(x => x.id === b.dataset.m);
     if (!m.subs) { mtClose(); applyMode(m.id); return; }
     if (b.getAttribute("aria-expanded") === "true") { mtClose(true); return; }
     mtClose(); showModes(false); const now = mCur();
-    mtShow(b, `<p class="mtm-h">${esc(m.name)}: choose one</p>` + m.subs.map(s => mtItem(s.id, s.name, s.text, s.id === now, s.def)).join(""), root.classList.contains("mt-side"));
+    mtShow(b, `<p class="mtm-h">${esc(T("{name}: choose one", { name: m.name }))}</p>` + m.subs.map(s => mtItem(s.id, s.name, s.text, s.id === now, s.def)).join(""), root.classList.contains("mt-side"));
   });
   /* the options bar's View segment: Listen has choices too, so it opens the same menu under the button (Verse by verse and Reading have none) */
   $("#segView").addEventListener("click", e => {
     const b = e.target.closest("[data-v=listen]"); if (!b) return; e.stopPropagation();
     if (b.getAttribute("aria-expanded") === "true") { mtClose(true); return; }
     mtClose(); showModes(false); const now = mCur(), L = MODES.find(x => x.id === "listen");
-    mtShow(b, `<p class="mtm-h">Listen: choose one</p>` + L.subs.map(s => mtItem(s.id, s.name, s.text, s.id === now && mtCur === "listen", s.def)).join(""));
+    mtShow(b, `<p class="mtm-h">${esc(T("{name}: choose one", { name: L.name }))}</p>` + L.subs.map(s => mtItem(s.id, s.name, s.text, s.id === now && mtCur === "listen", s.def)).join(""));
   }, true);
   mtMenu.addEventListener("click", e => { const b = e.target.closest("[data-s]"); if (b) { mtClose(); applyMode(b.dataset.s); } });
   document.addEventListener("pointerdown", e => { if (!mtMenu.hidden && !e.target.closest("#mtMenu, .mtab, #segView [data-v=listen]")) mtClose(); });
@@ -1597,7 +1629,7 @@
     if (e.key === "Escape") { e.stopPropagation(); mtClose(true); }
     else if (e.key === "ArrowDown" || e.key === "ArrowUp") { const it = [...mtMenu.querySelectorAll(".mtm")], i = it.indexOf(document.activeElement); e.preventDefault(); it[(i + (e.key === "ArrowDown" ? 1 : it.length - 1)) % it.length].focus(); }
   }, true);
-  { const grip = document.createElement("button"); grip.type = "button"; grip.className = "mt-grip"; grip.setAttribute("aria-label", "Show the mode tabs"); $("#reader").appendChild(grip);
+  { const grip = document.createElement("button"); grip.type = "button"; grip.className = "mt-grip"; grip.setAttribute("aria-label", T("Show the mode tabs")); $("#reader").appendChild(grip);
     let last = 0, acc = 0;
     const tuck = on => { if (root.classList.contains("mt-tuck") === on) return; root.classList.toggle("mt-tuck", on); if (on) mtClose(); setTimeout(() => recalc(), 300); };
     scroller.addEventListener("scroll", () => {
@@ -1608,6 +1640,60 @@
     grip.onclick = () => tuck(false); }
   $("#optTabs").onchange = e => { stat("setting_change", { setting: "tabs", value: e.target.value }); mtVariant(e.target.value, true); requestAnimationFrame(recalc); };
   drawTabs(); mtVariant();
+
+  /* the translation a reader of this language starts with, and what picking a language does (i18n.js plans it; the page reloads in the new language) */
+  /* one translation per language: the one the API marks as default, else our pick (lang/languages.js), else the language's first */
+  const usualTr = l => (S.trList.find(t => t.lang === l && t.def) || S.trList.find(t => t.id === (GQL.LANGS[l] || {}).tr) || S.trList.find(t => t.lang === l) || {}).id || "";
+  const defaultTr = () => usualTr(GQL.lang) || usualTr("en") || (S.trList[0] || { id: "en.sahih" }).id;
+  function chooseLanguage(code) {
+    if (!GQL.LANGS[code]) return;
+    const set = GQL.plan(code, { trs: S.trs, rtr: A.trRec, tr: usualTr(code), voice: usualVoice(code), fallback: usualTr("en"), has: id => !S.trList.length || S.trList.some(t => t.id === id) });
+    stat("language_change", { value: code, from: GQL.lang });
+    Object.entries(set).forEach(([k, v]) => store.set(k, v));
+    GQL.go(code, urlMode() === "path", { s: S.s, a: S.cur || 1 });
+  }
+  /* the language control (rules/languages.md): a corner tab level with the mode tabs, or a header button when the tabs are not on screen (CSS decides which shows).
+     In English it is the translate icon and opens the list; in any other language it says "English" and one tap switches to English. The list is also in Settings. */
+  const LG_ICON = '<svg class="gl-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8l6 6M4 14l6-6 2-3M2 5h12M7 2h1M22 22l-5-10-5 10M14 18h6"/></svg>';
+  const lgTab = document.createElement("button"); lgTab.type = "button"; lgTab.className = "lang-tab"; lgTab.setAttribute("data-noi18n", ""); $("#book").appendChild(lgTab);
+  const lgWord = GQL.ui !== "en", lgBtns = [$("#btnLang"), lgTab];
+  lgBtns.forEach(b => {
+    const word = '<span lang="en" dir="ltr">English</span>';
+    b.innerHTML = lgWord ? (b === lgTab ? LG_ICON + word : word) : LG_ICON; b.classList.toggle("word", lgWord);
+    b.title = lgWord ? "English" : T("Language"); b.setAttribute("aria-label", b.title); if (lgWord) b.lang = "en";
+    else { b.setAttribute("aria-haspopup", "dialog"); b.setAttribute("aria-expanded", "false"); b.setAttribute("aria-controls", "langpop"); }
+    b.onclick = () => lgWord ? chooseLanguage("en") : togglePop("lang");
+  });
+  new MutationObserver(() => { if (!lgWord) lgBtns.forEach(b => b.setAttribute("aria-expanded", String(!$("#langpop").hidden))); }).observe($("#langpop"), { attributes: true, attributeFilter: ["hidden"] });
+  /* the translations list changes the Quran's translation only: a row at its top leads to the language of the whole site (users confused the two) */
+  const tpSite = document.createElement("button"); tpSite.type = "button"; tpSite.className = "tp-site"; tpSite.id = "tpSite"; tpSite.setAttribute("data-noi18n", ""); tpSite.setAttribute("aria-haspopup", "dialog");
+  tpSite.innerHTML = `${LG_ICON}<span>${esc(T("Change the site language"))}</span><b lang="${GQL.lang}" dir="auto">${esc(GQL.info.n)}</b><i aria-hidden="true">›</i>`;
+  $("#trpick .psearch").before(tpSite);
+  tpSite.onclick = () => { closePops(); if (root.classList.contains("mt-tuck")) { root.classList.remove("mt-tuck"); setTimeout(() => recalc(), 300); } togglePop("lang"); };   // the top tabs come back, so the list hangs from its own tab
+  $("#optLangBtn").textContent = GQL.info.n; $("#optLangBtn").lang = GQL.lang;
+  $("#optLangBtn").onclick = () => { closeMenu(); closePops(); showKey(false); togglePop("lang"); };
+  const lgRow = (c, tag) => { const l = GQL.LANGS[c], on = c === GQL.lang; return `<button type="button" class="lg-r" data-l="${c}"${on ? ' aria-current="true"' : ""}><em aria-hidden="true">${on ? "✓" : ""}</em><b lang="${c}" dir="auto">${esc(l.n)}</b>${tag ? `<i class="lg-tag">${esc(T("Your browser"))}</i>` : ""}<small lang="en" dir="ltr">${esc(l.e)}</small></button>`; };
+  function drawLang() {
+    const q = fold($("#lgFilter").value.trim()), L = GQL.LANGS, mine = GQL.browser();
+    const all = Object.keys(L).filter(c => L[c].pick).sort((a, b) => L[a].e.localeCompare(L[b].e));
+    const hit = all.filter(c => !q || [L[c].n, L[c].e, c].some(v => fold(v).includes(q)));
+    const sug = [GQL.lang, mine].filter((c, i, x) => c && L[c] && x.indexOf(c) === i);
+    $("#lgList").innerHTML = (q ? "" : `<p class="lg-l">${esc(T("Suggested for you"))}</p>${sug.map(c => lgRow(c, c === mine)).join("")}<p class="lg-l">${esc(T("All languages"))}</p>`)
+      + (hit.map(c => lgRow(c)).join("") || `<p class="lg-none">${esc(T("No language found"))}</p>`);
+  }
+  function openLang() { const f = $("#lgFilter"); f.value = ""; drawLang(); $("#lgList").scrollTop = 0; if (matchMedia("(hover:hover)").matches) f.focus({ preventScroll: true }); }
+  $("#lgFilter").addEventListener("input", drawLang);
+  $("#lgFilter").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); const b = $("#lgList .lg-r"); b && b.click(); } });
+  $("#lgX").onclick = () => closePops();
+  $("#lgList").addEventListener("click", e => {
+    const b = e.target.closest("[data-l]"); if (!b) return; closePops();
+    if (b.dataset.l === GQL.lang) store.set("lang", GQL.lang); else chooseLanguage(b.dataset.l);   // picking the language already shown only remembers it
+  });
+  /* Settings > Numbers: only for languages that have digits of their own */
+  if (GQL.hasDigits) { const own = Array.from({ length: 4 }, (_, i) => String.fromCharCode(GQL.zero + i)).join("");
+    $("#setDigits").hidden = false; $("#optDigits").innerHTML = `<option value="native">${own}</option><option value="latn">0123</option>`; $("#optDigits").value = GQL.native ? "native" : "latn";
+    $("#optDigits").onchange = e => { stat("setting_change", { setting: "digits", value: e.target.value }); store.set("digits", e.target.value); location.reload(); }; }
+  $$("#optSpeed option, #plSpeedSeg button").forEach(o => { o.textContent = N(o.dataset.v || o.value) + "×"; });
 
   /* ---------- go ---------- */
   async function init() {
@@ -1620,13 +1706,13 @@
     const legacyTr = (typeof window.GQ_TRANSLATIONS === "string" ? trParse(window.GQ_TRANSLATIONS) : Array.isArray(window.GQ_TRANSLATIONS) ? window.GQ_TRANSLATIONS : (window.gq && window.gq._quran) || []).filter(id => trList.some(t => t.id === id));
     if (hadTr == null && !linked.length && legacyTr.length) S.trs = [...new Set(legacyTr)];   // the site's own default translations (GQ_TRANSLATIONS, or the old gq.quran.add calls); ids we don't have are ignored
     else if (hadTr == null && !linked.length) {   // first visit: a translation in the reader's language if we have one, else English
-      const langs = (navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language || "en"]).map(l => String(l).toLowerCase().split("-")[0]);
-      const pick = l => trList.find(t => t.id === PREF_TR[l]) || trList.find(t => t.lang === l);
-      const hit = langs.map(pick).find(Boolean); S.trs = [(hit || trList.find(t => t.id === "en.sahih") || trList[0] || { id: "en.sahih" }).id];
+      const sent = qs.get("t"); S.trs = GQL.lang === "ar" ? [] : [trList.some(t => t.id === sent) ? sent : defaultTr()];   // Arabic: the Quran itself; a shared link's translation first
     }
-    if (!trList.some(t => t.id === S.rdTr)) S.rdTr = S.trs[0] || "en.sahih";
-    const asked = S.trs.length; S.trs = S.trs.filter(id => trList.some(t => t.id === id)); if (asked && !S.trs.length) S.trs = [(trList.find(t => t.id === "en.sahih") || trList[0] || { id: "en.sahih" }).id];
-    if (!S.tlList.some(x => x.id === TL.id)) { const l0 = String(navigator.language || "en").toLowerCase().split("-")[0]; TL.id = (S.tlList.find(x => x.lang === l0) || S.tlList.find(x => x.lang === "en") || S.tlList[0]).id; }
+    if (S.rd === "tr" && arabicOnly() && !store.get("rdtr")) S.rd = "ar";   // Arabic never gets a translation by itself
+    if (!trList.some(t => t.id === S.rdTr)) S.rdTr = S.trs[0] || defaultTr();
+    if (pref("rtr", null) == null && usualVoice(GQL.lang) && !GQL.info.tr) A.trRec = usualVoice(GQL.lang);   // a language with a voice but no translation yet: its voice after the Arabic
+    const asked = S.trs.length; S.trs = S.trs.filter(id => trList.some(t => t.id === id)); if (asked && !S.trs.length) S.trs = [defaultTr()];
+    if (!S.tlList.some(x => x.id === TL.id)) TL.id = (S.tlList.find(x => x.id === GQL.info.tl) || S.tlList.find(x => x.lang === "en") || S.tlList[0]).id;
     const SH = ["listen", "both", "ar", "tr"].includes(qs.get("m")) ? { m: qs.get("m"), l: ["ar", "both", "tr"].includes(qs.get("l")) ? qs.get("l") : "ar", t: qs.get("t") || "", r: qs.get("r") || "", v: qs.get("v") || "" } : null;   // see shareParams()
     if (SH && !EMBED) { try { const sp = new URLSearchParams(location.search); ["m", "l", "t", "r", "v"].forEach(k => sp.delete(k)); history.replaceState(null, "", location.pathname + (sp.toString() ? "?" + sp : "") + location.hash); } catch (e) {} }   // used once: a reload does not start the recitation again
     const SHL = SH && SH.m === "listen" && !EMBED ? SH : null;
@@ -1637,8 +1723,8 @@
     $("#optLayout").value = layoutPref; $("#optFont").value = ["mushaf", "me", "amiri", "kfc"].includes(fontPref) ? fontPref : "mushaf";
     $("#optCredit").checked = root.classList.contains("cite-each"); $("#optFollow").checked = follow;
     buildReciters(); setSpeed(A.speed);
-    $("#yr").textContent = new Date().getFullYear(); syncMenuBtn();
-    $("#btnKey").innerHTML = `<span class="lbl">Tajweed</span>` + [["n", "Madd"], ["g", "Ghunnah"], ["q", "Qalqalah"], ["f", "Ikhfa"], ["a", "Idgham"], ["i", "Iqlab"], ["s", "Silent"]].map(([k, t]) => `<span class="g"><i class="tj-${k}"></i>${t}</span>`).join("") + `<span class="more">KEY ›</span>`;
+    $("#yr").textContent = N(new Date().getFullYear()); syncMenuBtn();
+    $("#btnKey").innerHTML = `<span class="lbl">${esc(T("Tajweed"))}</span>` + [["n", T("Madd")], ["g", T("Ghunnah")], ["q", T("Qalqalah")], ["f", T("Ikhfa")], ["a", T("Idgham")], ["i", T("Iqlab")], ["s", T("Silent")]].map(([k, t]) => `<span class="g"><i class="tj-${k}"></i>${esc(t)}</span>`).join("") + `<span class="more">${esc(T("KEY"))} <span class="fwd">›</span></span>`;
     $("#legend").innerHTML = $("#legend2").innerHTML = TJ.rules.map(([k, t]) => `<li class="tj-${k}"><i></i><span>${t}</span></li>`).join("");
     syncTajweedUi(); syncWbw(); fillMarkSnippets();
     applyTheme(); buildSurahList(); drawMarks(); syncSavedUi();
@@ -1650,12 +1736,12 @@
        Open a saved one instead: the remembered place if it is saved, else the last saved surah the person read, else the first. */
     if (navigator.onLine === false && window.GQOff && !EMBED) {   // also when the address names the surah: a reload keeps the address of the one that failed
       const rdy = (GQOff.ready && GQOff.ready()) || [];
-      if (rdy.length && !rdy.includes(s)) { const seen = (JSON.parse(localStorage.getItem("gq2.off") || "{}").seen || []).slice().reverse().find(n => rdy.includes(n)); s = seen || rdy[0]; a = 1; setTimeout(() => toast("You're offline, so a saved surah opened"), 1200); }
+      if (rdy.length && !rdy.includes(s)) { const seen = (JSON.parse(localStorage.getItem("gq2.off") || "{}").seen || []).slice().reverse().find(n => rdy.includes(n)); s = seen || rdy[0]; a = 1; setTimeout(() => toast(T("You're offline, so a saved surah opened")), 1200); }
     }
     syncView(); syncTrChip(); syncReciters();
     /* offline (offline.js): what only this file knows is handed over once; the cloud in the header, the status on each surah and the library are drawn there */
     if (window.GQOff && !EMBED) GQOff.attach({
-      assets: ASSETS, colr: COLR, surahs: () => S.data.surahs, cur: () => S.s, closePops, togglePop, toast, stat,
+      name: n => sName(meta(n)), fold, assets: ASSETS, colr: COLR, surahs: () => S.data.surahs, cur: () => S.s, closePops, togglePop, toast, stat,
       textIds: () => [...new Set(["quran-uthmani", "quran-tajweed", ...S.trs, ...(S.rdTr ? [S.rdTr] : []), ...(TL.on && TL.id ? [TL.id] : [])])],   // every edition the page can draw
       voices: () => {   // the voices the player would use: the Quran reciter, the translation voice, or the default reciter when both are off
         const ids = []; if (A.reciter) ids.push(A.reciter); const t = trRecId(); if (t && !ids.includes(t)) ids.push(t); if (!ids.length) ids.push("ar.alafasy");
@@ -1672,7 +1758,8 @@
     });
     const opening = openSurah(s, a, { flash: false, via: "start" });
     if (!EMBED && !route.s && !route.page && !route.eds.length && route.search == null && !store.get("pos") && !store.get("modes")) showModes(true);   // very first visit, landing page
-    if (window.GQA) GQA.start({ mode: store.get("mode") || "default", entry: route.search != null ? "search_link" : route.page ? "page_link" : route.eds.length ? "edition_link" : route.s ? "link" : store.get("pos") ? "resume" : "new", view: S.view, show: S.view === "read" ? S.rd : "both", font: FONT, theme: S.theme, tajweed: TJ.on ? "on" : "off", translit: TL.on ? TL.id : "off", translations: S.trs.length, tr_lang: (S.trs[0] || "none").split(".")[0], device: innerWidth < 720 ? "phone" : innerWidth < 1100 ? "tablet" : "desktop" });
+    if (window.GQA) GQA.start({ lang: GQL.lang, ui: GQL.ui, mode: store.get("mode") || "default", entry: route.search != null ? "search_link" : route.page ? "page_link" : route.eds.length ? "edition_link" : route.s ? "link" : store.get("pos") ? "resume" : "new", view: S.view, show: S.view === "read" ? S.rd : "both", font: FONT, theme: S.theme, tajweed: TJ.on ? "on" : "off", translit: TL.on ? TL.id : "off", translations: S.trs.length, tr_lang: (S.trs[0] || "none").split(".")[0], device: innerWidth < 720 ? "phone" : innerWidth < 1100 ? "tablet" : "desktop" });
+    countMissingLanguage();
     if (EMBED) parent.postMessage({ source: "globalquran", type: "ready" }, "*");
     if (document.fonts) document.fonts.ready.then(() => recalc());
     if (SHL && route.s) { await opening; A.gate = true; await applyMode({ ar: "listen_ar", both: "listen_both", tr: "listen_tr" }[SHL.l], { from: a, trRec: TR_REC.some(x => x[0] === SHL.v) ? SHL.v : "" }); }   // the same Listen stage, the recitation starting at the shared verse
@@ -1688,7 +1775,7 @@
   addEventListener("hashchange", onAddress); addEventListener("popstate", onAddress);
   /* the small surface login.js needs (sign-in is optional and lives in its own file) */
   window.GQApp = {
-    EMBED, store, toast,
+    EMBED, store, toast, chooseLanguage,
     getBms: () => bms.slice(),
     setBms(list) { bms = list.slice(); store.set("bm", JSON.stringify(bms)); drawMarks(); markBookmarks(); syncSavedUi(); if (S.mode === "saved") renderSaved(); },
   };

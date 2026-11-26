@@ -61,8 +61,8 @@
     const state = () => {
       const m = mode(); banner.hidden = m !== "unset";
       if (chk) chk.checked = m === "granted";
-      $("#prState").textContent = m === "granted" ? "Statistics are on." : m === "denied" ? "Statistics are off." : "No choice made yet: statistics are off.";
-      $("#prToggle").textContent = m === "granted" ? "Turn off" : "Allow";
+      $("#prState").textContent = m === "granted" ? GQL.t("Statistics are on.") : m === "denied" ? GQL.t("Statistics are off.") : GQL.t("No choice made yet: statistics are off.");
+      $("#prToggle").textContent = m === "granted" ? GQL.t("Turn off") : GQL.t("Allow");
     };
     const set = v => {
       ls.set("gq2.consent")(v);

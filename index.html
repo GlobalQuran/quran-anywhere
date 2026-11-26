@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" translate="no">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, viewport-fit=cover">
@@ -11,6 +11,11 @@
   /* edition ids look like en.sahih / quran-uthmani, so a folder called "quran" or "app" is never mistaken for one; the app can sit at any depth */
   var base = window.GQ_BASE, m = /^(.*?\/)((?:(?:[a-z]{2,3}\.[\w\-]+|quran-[\w\-]+)(?:\+(?:[a-z]{2,3}\.[\w\-]+|quran-[\w\-]+))*\/)?(?:\d{1,3}(?::\d{1,3})?|search\/.*)\/?)$/i.exec(location.pathname);
   if (!base && m) base = m[1];
+  /* language addresses (/ur, /ur/2:255) on our own site and while testing: the language is not part of the folder the app lives in (i18n.js reads it) */
+  if (!window.GQ_BASE && (window.GQ_LANG_PATHS === true || /^((www\.)?globalquran\.com|localhost|127\.0\.0\.1)$/i.test(location.hostname))) {
+    var l = /^(.*?\/)(?:ar|az|bg|bn|bs|cs|de|dv|en|es|fa|fr|ha|hi|id|it|ja|ko|ku|ml|ms|nl|no|pl|pt|ro|ru|sd|si|so|sq|sv|sw|ta|tg|th|tr|tt|ug|ur|uz|zh)(?:\/((?:(?:(?:[a-z]{2,3}\.[\w\-]+|quran-[\w\-]+)(?:\+(?:[a-z]{2,3}\.[\w\-]+|quran-[\w\-]+))*\/)?(?:\d{1,3}(?::\d{1,3})?|search\/.*)\/?)?))?$/i.exec(location.pathname);
+    if (l) base = l[1];
+  }
   if (base) document.write('<base href="' + base + '">');
 }());
 </script>
@@ -18,16 +23,20 @@
 /* Backward compatibility: the older app's settings file (gq.setConfig(config); gq.start(); gq.quran.add("id")) is accepted. app.js reads what it hands over. */
 window.gq = window.gq || { _quran: [], setConfig: function (c) { window.GQ_LEGACY = c || {}; }, start: function () {}, quran: { add: function (id) { window.gq._quran.push(id); }, reset: function () { window.gq._quran = []; } } };
 </script>
+<script src="lang/languages.js?v=1"></script>
+<script src="i18n.js?v=3"></script>
 <link rel="icon" href="favicon.ico" sizes="any">
 <link rel="icon" type="image/png" sizes="32x32" href="img/icons/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="img/icons/favicon-16.png">
 <link rel="apple-touch-icon" sizes="180x180" href="img/icons/apple-touch-icon.png">
 <link rel="manifest" href="site.webmanifest">
 <meta name="theme-color" content="#1a2224">
+<!-- the site has its own languages: browsers must not translate it (machine translation also rewrote the Quran translations) -->
+<meta name="google" content="notranslate">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Global Quran">
-<link rel="stylesheet" href="app.css?v=104">
-<link rel="stylesheet" href="login.css?v=3">
+<link rel="stylesheet" href="app.css?v=115">
+<link rel="stylesheet" href="login.css?v=4">
 </head>
 <body>
 <a class="skip" id="skip" href="#">Skip to the Quran text</a>
@@ -40,7 +49,7 @@ window.gq = window.gq || { _quran: [], setConfig: function (c) { window.GQ_LEGAC
   <aside class="side" id="side" aria-label="Menu">
     <a class="brand" href="./" aria-label="Global Quran home">
       <svg class="brand-mark"><use href="img/sprite.svg#mark"/></svg>
-      <span class="brand-txt"><span class="brand-ar">العالمي</span><span class="brand-en">GLOBAL QURAN</span></span>
+      <span class="brand-txt" data-noi18n><span class="brand-ar" lang="ar">العالمي</span><span class="brand-en">GLOBAL QURAN</span></span>
     </a>
     <div class="side-tabs" role="tablist">
       <button role="tab" data-tab="surahs" class="on"><svg><use href="img/sprite.svg#i-lib"/></svg>Surahs</button>
@@ -60,6 +69,8 @@ window.gq = window.gq || { _quran: [], setConfig: function (c) { window.GQ_LEGAC
         <label class="set"><span>Layout</span><select id="optLayout"><option value="auto">Automatic</option><option value="stacked">Arabic above translation</option><option value="side">Side by side</option></select></label>
         <label class="set"><span>Mode tabs</span><select id="optTabs"><option value="top">On the top</option><option value="side">On the side</option><option value="none">Hidden</option></select></label>
         <label class="set"><span>Arabic font</span><select id="optFont"><option value="mushaf">Mushaf (Madani page)</option><option value="amiri">Amiri Quran</option><option value="kfc">KFC Naskh</option><option value="me">Me Quran</option></select></label>
+        <div class="set" id="setLang"><span>Language</span><button class="set-btn" id="optLangBtn" type="button" aria-haspopup="dialog" aria-controls="langpop" data-noi18n></button></div>
+        <label class="set" id="setDigits" hidden><span>Numbers</span><select id="optDigits" data-noi18n></select></label>
         <label class="set"><span>Theme</span><select id="optTheme"><option value="day">Day</option><option value="night">Night</option><option value="auto">Match system</option></select></label>
         <label class="set"><span>Quran reciter</span><select id="optReciter"></select></label>
         <label class="set"><span>Translation reciter</span><select id="optTrRec"></select></label>
@@ -74,7 +85,7 @@ window.gq = window.gq || { _quran: [], setConfig: function (c) { window.GQ_LEGAC
         <ul class="legend" id="legend"></ul>
       </section>
     </div>
-    <div class="side-foot"><a href="https://globalquran.com" target="_blank" rel="noopener">GlobalQuran.com</a> · © 2006–<span id="yr">2026</span></div>
+    <div class="side-foot"><a href="https://globalquran.com" target="_blank" rel="noopener" data-noi18n>GlobalQuran.com</a> · <bdi dir="ltr">© 2006–<span id="yr">2026</span></bdi></div>
   </aside>
   <div class="scrim" id="scrim"></div>
 
@@ -97,6 +108,7 @@ window.gq = window.gq || { _quran: [], setConfig: function (c) { window.GQ_LEGAC
           </div></div>
           <div class="hgrp">
             <button class="hbtn" id="btnOff" type="button" aria-label="Offline" aria-haspopup="dialog" aria-expanded="false" aria-controls="offpop" hidden></button>
+            <button class="hbtn" id="btnLang" type="button" aria-label="Language" data-noi18n></button>
             <button class="hbtn" id="btnTheme" aria-label="Day / night"><svg><use href="img/sprite.svg#i-moon"/></svg></button>
             <button class="hbtn" id="btnTools" aria-label="Reading options" aria-expanded="false" aria-controls="tools"><svg><use href="img/sprite.svg#i-gear"/></svg></button>
           </div>
@@ -141,7 +153,7 @@ window.gq = window.gq || { _quran: [], setConfig: function (c) { window.GQ_LEGAC
           <div class="kbd-card">
             <div class="kbd-h"><h2 id="kbdT">Keyboard shortcuts</h2><button type="button" class="icon-btn" id="kbdClose" aria-label="Close shortcuts"><svg><use href="img/sprite.svg#i-close"/></svg></button></div>
             <div class="kbd-body" id="kbdBody" tabindex="0"></div>
-            <p class="kbd-foot">Shortcuts don't work while you are typing in a box. Press <kbd class="kc kc-s">?</kbd> any time to open this list.</p>
+            <p class="kbd-foot" data-i18n-html="Shortcuts don't work while you are typing in a box. Press {key} any time to open this list.">Shortcuts don't work while you are typing in a box. Press <kbd class="kc kc-s" data-slot="key" dir="ltr">?</kbd> any time to open this list.</p>
           </div>
         </div>
         <!-- usage statistics: a quiet card (only where consent is needed) and a short explanation; both live inside the page frame, shown only on globalquran.com (see analytics.js) -->
@@ -162,7 +174,7 @@ window.gq = window.gq || { _quran: [], setConfig: function (c) { window.GQ_LEGAC
         <!-- shown inside the page frame, in place of its contents, when the service can't be reached or is failing (see down() in app.js) -->
         <div class="oops" id="oops" role="alert" hidden>
           <div class="oops-in">
-            <div class="oops-brand"><span>العالمي</span> GLOBAL QURAN</div>
+            <div class="oops-brand" data-noi18n><span lang="ar">العالمي</span> GLOBAL QURAN</div>
     <svg class="oops-art" viewBox="0 0 640 270" aria-hidden="true" focusable="false">
               <defs>
                 <path id="frond" d="M0 0C26-36 74-40 116-4C76-22 32-16 0 0Z"/>
@@ -238,6 +250,12 @@ window.gq = window.gq || { _quran: [], setConfig: function (c) { window.GQ_LEGAC
         </div>
         <div class="om" id="offmini" role="dialog" aria-modal="true" hidden></div>
         <div class="offdock" id="offdock" role="status" hidden></div>
+        <!-- the language list: opened by the corner tab or header button (in English) and by Settings > Language; drawn in app.js -->
+        <div class="pop langpop" id="langpop" role="dialog" aria-labelledby="lgT" hidden>
+          <div class="lg-h"><b id="lgT">Language</b><button type="button" class="icon-btn" id="lgX" aria-label="Close"><svg><use href="img/sprite.svg#i-close"/></svg></button></div>
+          <label class="psearch"><svg><use href="img/sprite.svg#i-search"/></svg><input type="search" id="lgFilter" placeholder="Search language" autocomplete="off"></label>
+          <div class="lg-list" id="lgList"></div>
+        </div>
         <div class="pop picker" id="picker" role="dialog" aria-label="Choose a surah" hidden>
           <label class="psearch"><svg><use href="img/sprite.svg#i-search"/></svg><input type="search" id="pickFilter" placeholder="Search surah or number" autocomplete="off"></label>
           <ul class="plist" id="pickList"></ul>
@@ -287,11 +305,12 @@ window.gq = window.gq || { _quran: [], setConfig: function (c) { window.GQ_LEGAC
 </div>
 
 <audio id="audio" preload="none" crossorigin="anonymous"></audio>
+<script>window.GQL && GQL.apply(document.body);</script>
 <script src="gq-api.js?v=6"></script>
-<script src="analytics.js?v=2"></script>
-<script src="offline.js?v=9"></script>
-<script src="app.js?v=105"></script>
-<script src="site.js?v=11"></script>
-<script src="login.js?v=5" defer></script>
+<script src="analytics.js?v=3"></script>
+<script src="offline.js?v=11"></script>
+<script src="app.js?v=109"></script>
+<script src="site.js?v=12"></script>
+<script src="login.js?v=6" defer></script>
 </body>
 </html>

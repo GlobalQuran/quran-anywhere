@@ -15,6 +15,7 @@
   "use strict";
   const qs = new URLSearchParams(location.search);
   const App = window.GQApp;
+  const T = GQL.t, N = GQL.num;   // words and numbers in the reader's language (i18n.js)
   if (!App || qs.get("login") === "0" || window.GQ_LOGIN === false) return;
   const EMBED = App.EMBED;
 
@@ -58,7 +59,7 @@
   const loadProviders = () => providers ? Promise.resolve(providers) : fetch(AUTH + "/api/gq/providers").then(r => r.json()).then(p => (providers = p)).catch(() => (providers = { providers: [] }));
 
   /* ---------- what is kept ---------- */
-  const SET_KEYS = ["trs", "rtr", "reciter", "theme", "font", "fsAr", "fsTr", "layout", "speed", "tajweed", "tlit", "wbw", "credit", "follow", "rdtr", "rd", "tabs", "view", "lastview", "mode", "modes", "tlid", "lsbg", "keyhide", "tr"];
+  const SET_KEYS = ["trs", "rtr", "reciter", "theme", "font", "fsAr", "fsTr", "layout", "speed", "tajweed", "tlit", "wbw", "credit", "follow", "rdtr", "rd", "tabs", "view", "lastview", "mode", "modes", "tlid", "lsbg", "keyhide", "tr", "lang", "digits"];
   function collect() {
     const d = { bm: App.getBms() };
     if (!EMBED) {   // an embed only keeps saved verses: the host page decides the look and where it opens
@@ -106,7 +107,7 @@
     const w = window.open(u.href, "gq-login", "popup=yes,width=440,height=700");
     if (!w) {   // pop-ups blocked: on the website go there and come back; an embed asks to allow them
       if (!EMBED) { const f = new URL(LOGIN + "/"); f.searchParams.set("reason", "save"); f.searchParams.set("redirect", location.href); location.href = f.href; }
-      else App.toast("Allow pop-ups to sign in");
+      else App.toast(T("Allow pop-ups to sign in"));
       return;
     }
     const t = setInterval(() => { if (w.closed) { clearInterval(t); if (!EMBED && !user) checkSession(true); } }, 700);
@@ -128,12 +129,12 @@
   async function signedIn(fresh) {
     closeCard(); closePill(); renderSide();
     try { await pull(fresh); } catch (e) { /* offline or server down: everything stays on the device and is sent next time */ }
-    if (fresh) App.toast("Signed in" + (user.name ? " as " + user.name : "") + ". Saved verses are kept on every device.");
+    if (fresh) App.toast(user.name ? T("Signed in as {name}. Saved verses are kept on every device.", { name: user.name }) : T("Signed in. Saved verses are kept on every device."));
   }
   async function signOut() {
     try { if (!EMBED) await fetch(AUTH + "/api/v1/auth/logout", { method: "POST", credentials: "include" }); } catch (e) {}
     user = null; token = null; ss.set("gq.tok", ""); kv.del("syncUser"); kv.set("dirty", "0");
-    renderSide(); App.toast("Signed out. Your saved verses stay on this device.");
+    renderSide(); App.toast(T("Signed out. Your saved verses stay on this device."));
   }
 
   /* ---------- the card next to Save ---------- */
@@ -146,11 +147,11 @@
     if (card || shown || user) return; shown = true;
     const p = await loadProviders(); if (user || card) return;
     const have = new Set(p.providers || []);
-    card = el("div", "sg-card"); card.setAttribute("role", "dialog"); card.setAttribute("aria-label", "Keep your saved verses on every device");
-    card.innerHTML = '<button class="sg-x" aria-label="Close">×</button><h3>Saved on this device</h3><p>Sign in to keep your saved verses, where you stopped and your settings on every device.</p>' +
-      (have.has("google") ? '<button class="sg-b" data-m="google">' + G + 'Continue with Google</button>' : "") +
-      (have.has("apple") ? '<button class="sg-b sg-a" data-m="apple">' + A + 'Continue with Apple</button>' : "") +
-      (have.size ? '<button class="sg-link" data-m="email">Use email instead</button>' : '<button class="sg-b" data-m="email">Continue with email</button>');
+    card = el("div", "sg-card"); card.setAttribute("role", "dialog"); card.setAttribute("aria-label", T("Keep your saved verses on every device"));
+    card.innerHTML = '<button class="sg-x" aria-label="' + esc(T("Close")) + '">×</button><h3>' + esc(T("Saved on this device")) + '</h3><p>' + esc(T("Sign in to keep your saved verses, where you stopped and your settings on every device.")) + '</p>' +
+      (have.has("google") ? '<button class="sg-b" data-m="google">' + G + esc(T("Continue with Google")) + '</button>' : "") +
+      (have.has("apple") ? '<button class="sg-b sg-a" data-m="apple">' + A + esc(T("Continue with Apple")) + '</button>' : "") +
+      (have.size ? '<button class="sg-link" data-m="email">' + esc(T("Use email instead")) + '</button>' : '<button class="sg-b" data-m="email">' + esc(T("Continue with email")) + '</button>');
     document.body.appendChild(card);
     card.addEventListener("click", e => {
       if (e.target.closest(".sg-x")) { closedByUser(); closeCard(); return; }
@@ -189,12 +190,12 @@
     if (user) {
       side.hidden = true; acct.hidden = false;
       acct.className = "sg-side on";
-      acct.innerHTML = '<span>Signed in as <b style="display:inline;font:inherit;font-weight:700">' + esc(user.name || user.email || "you") + '</b></span><button class="sg-link" type="button">Sign out</button>';
+      acct.innerHTML = '<span>' + T("Signed in as {name}", { name: '<b style="display:inline;font:inherit;font-weight:700" dir="auto">' + esc(user.name || user.email || T("you")) + '</b>' }) + '</span><button class="sg-link" type="button">' + esc(T("Sign out")) + '</button>';
       $("button", acct).onclick = signOut;
     } else {
       acct.hidden = true; side.hidden = false;
       side.className = "sg-side";
-      side.innerHTML = '<b>Keep these on every device</b><small>Sign in to keep your saved verses, where you stopped and your settings.</small><button class="ob pri" type="button">Sign in</button>';
+      side.innerHTML = '<b>' + esc(T("Keep these on every device")) + '</b><small>' + esc(T("Sign in to keep your saved verses, where you stopped and your settings.")) + '</small><button class="ob pri" type="button">' + esc(T("Sign in")) + '</button>';
       $("button", side).onclick = () => startSignIn();
     }
   }
@@ -218,7 +219,7 @@
     const pos = App.store.get("pos"); if (!pos) return;
     pillShown = true;
     pill = el("div", "sg-pill"); pill.setAttribute("role", "status");
-    pill.innerHTML = '<span>Pick up at <b>' + esc(pos) + '</b> on every device?</span><span class="sg-pb"><button class="ob pri sm" type="button">Sign in</button><button class="sg-link" type="button">Not now</button></span>';
+    pill.innerHTML = '<span>' + T("Pick up at {ref} on every device?", { ref: '<b><bdi>' + esc(N(pos)) + '</bdi></b>' }) + '</span><span class="sg-pb"><button class="ob pri sm" type="button">' + esc(T("Sign in")) + '</button><button class="sg-link" type="button">' + esc(T("Not now")) + '</button></span>';
     document.body.appendChild(pill);
     $(".ob", pill).onclick = () => startSignIn();
     $(".sg-link", pill).onclick = () => { const st = pillState(); kv.set("pill", JSON.stringify({ n: (st.n || 0) + 1, t: Date.now() })); closePill(); };
@@ -235,7 +236,7 @@
     if (EMBED || user || !mayAsk()) return;
     const p = await loadProviders();
     if (user || !(p.providers || []).includes("google") || !p.googleClientId) return;
-    const s = document.createElement("script"); s.src = "https://accounts.google.com/gsi/client"; s.async = true;
+    const s = document.createElement("script"); s.src = "https://accounts.google.com/gsi/client?hl=" + GQL.ui; s.async = true;
     s.onload = () => {
       try {
         google.accounts.id.initialize({

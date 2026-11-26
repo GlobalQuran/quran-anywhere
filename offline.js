@@ -12,6 +12,9 @@ window.GQOff = (() => {
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   const PAUSE = { paused: true };
   const qs = new URLSearchParams(location.search);
+  const T = GQL.t, TN = GQL.tn, N = GQL.num;   // words and numbers in the reader's language (i18n.js)
+  const nSurahs = n => TN(n, "{n} surah", "{n} surahs");
+  const pc = p => N(p) + "%";
   let supported = (() => { try { return "serviceWorker" in navigator && "caches" in window && window.isSecureContext && window.top === window && qs.get("embed") !== "1" && new URL(document.baseURI).origin === location.origin; } catch (e) { return false; } })();
   let api = null, cache = null, PAGES = null, FREE = null;
 
@@ -20,7 +23,7 @@ window.GQOff = (() => {
   let ST = (() => { try { const o = JSON.parse(localStorage.getItem(KEY) || "null"); if (o && o.v === 1) return Object.assign(fresh(), o); } catch (e) {} return fresh(); })();
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(ST)); } catch (e) {} };
 
-  const fmt = mb => mb < 1 ? Math.max(1, Math.round(mb * 1000)) + " KB" : mb < 10 ? mb.toFixed(1) + " MB" : mb < 1000 ? Math.round(mb) + " MB" : (mb / 1000).toFixed(2) + " GB";
+  const fmt = mb => "\u2068" + (mb < 1 ? N(Math.max(1, Math.round(mb * 1000))) + " KB" : mb < 10 ? N(mb.toFixed(1)) + " MB" : mb < 1000 ? N(Math.round(mb)) + " MB" : N((mb / 1000).toFixed(2)) + " GB") + "\u2069";   // kept together inside right-to-left sentences
 
   /* ---------- sizes: estimates for what is not saved yet (a mushaf page is two fonts, plain and colour; a verse of audio follows the bitrate) ---------- */
   const MT = .0026, fontMB = () => api.colr ? .235 : .12, audioMB = kbs => .112 * ((+kbs || 128) / 128);
@@ -204,9 +207,9 @@ window.GQOff = (() => {
   const listenNames = () => api.voices().map(v => v.name).join(" + ");
   /* a voice is named in English and, when it differs, in its own language and script (read right to left where it needs to) */
   const nat = s => s ? `<span class="nat" dir="auto">${esc(s)}</span>` : "";
-  const vh = (name, native) => esc(name) + nat(native);
+  const vh = (name, native) => "<bdi>" + esc(name) + nat(native) + "</bdi>";   // one unit each, so Latin and Arabic names keep their order in a right-to-left sentence
   const listenHtml = () => api.voices().map(v => vh(v.name, v.native)).join(" + ");
-  const surahName = n => surah(n).en;
+  const surahName = n => api.name(n);
   const pct = n => Math.round((Q.prog[n] || 0) * 100);
 
   /* ---------- the glyph on every surah row (list and quick picker) ---------- */
@@ -216,9 +219,9 @@ window.GQOff = (() => {
       const n = +b.dataset.og, st = state(n), p = st === "busy" ? pct(n) : 0, mis = st === "ready" && !isComplete(n);
       const tk = UI.selMode && st === "none" && SEL.has(n), key = st + p + (tk ? "t" : "") + (online() ? "" : "x"); if (b.dataset.k === key) return; b.dataset.k = key;
       b.className = "og og-" + st + (tk ? " og-tick" : ""); const li = b.closest("li"); if (li) li.classList.toggle("is-ready", st === "ready");
-      b.innerHTML = st === "busy" ? ring(Q.prog[n] || 0, 11) + `<b>${Q.run ? p : ""}</b>${Q.run ? "" : ic("play")}` : st === "wait" ? `<svg class="rg" viewBox="0 0 28 28" aria-hidden="true"><circle class="t" cx="14" cy="14" r="11" stroke-dasharray="3 4.2"/></svg><b>${Q.list.indexOf(n) + 1}</b>` : st === "ready" || tk ? ic("check") : ic("cloud");
-      b.setAttribute("aria-label", tk ? `${surahName(n)} is ticked` : st === "busy" ? `${Q.run ? "Pause" : "Resume"} saving ${surahName(n)}` : st === "wait" ? `${surahName(n)} is waiting. Cancel` : st === "ready" ? `${surahName(n)} is ready offline. Options` : `Save ${surahName(n)} for offline`);
-      b.title = st === "ready" ? (mis ? "Ready offline (needs an update)" : "Ready offline") : st === "busy" ? "Saving" : st === "wait" ? "Waiting" : "Save for offline";
+      b.innerHTML = st === "busy" ? ring(Q.prog[n] || 0, 11) + `<b>${Q.run ? N(p) : ""}</b>${Q.run ? "" : ic("play")}` : st === "wait" ? `<svg class="rg" viewBox="0 0 28 28" aria-hidden="true"><circle class="t" cx="14" cy="14" r="11" stroke-dasharray="3 4.2"/></svg><b>${N(Q.list.indexOf(n) + 1)}</b>` : st === "ready" || tk ? ic("check") : ic("cloud");
+      const v = { name: surahName(n) }; b.setAttribute("aria-label", tk ? T("{name} is ticked", v) : st === "busy" ? (Q.run ? T("Pause saving {name}", v) : T("Resume saving {name}", v)) : st === "wait" ? T("{name} is waiting. Cancel", v) : st === "ready" ? T("{name} is ready offline. Options", v) : T("Save {name} for offline", v));
+      b.title = st === "ready" ? (mis ? T("Ready offline (needs an update)") : T("Ready offline")) : st === "busy" ? T("Saving") : st === "wait" ? T("Waiting") : T("Save for offline");
     });
     $$("#surahList li").forEach(li => { const g = $("[data-og]", li); if (g) li.classList.toggle("og-ticked", UI.selMode && SEL.has(+g.dataset.og)); });
     const ul = $("#surahList"); if (ul) { ul.classList.toggle("f-ready", UI.listFilter === "ready"); ul.classList.toggle("f-none", UI.listFilter === "none"); ul.classList.toggle("og-select", UI.selMode); }
@@ -226,10 +229,10 @@ window.GQOff = (() => {
   function renderStrip() {
     const el = $("#offStrip"); if (!el) return;
     const off = !online(), sel = UI.selMode, list = [...SEL].filter(n => !isComplete(n) && !Q.list.includes(n)).sort((a, b) => a - b);
-    el.innerHTML = (off ? `<div class="os-row">${ic("nowifi")}<span class="os-t"><b>You're offline</b><small>${nReady()} surah${nReady() === 1 ? " is" : "s are"} ready</small></span></div>`
-      : `<div class="os-row">${ic("cloud")}<span class="os-t"><b>${nReady()} of 114 ready offline</b><small>${fmt(onDevice())} on this device</small></span><button type="button" class="os-btn" data-oa="lib">Manage</button></div>`)
-      + `<div class="os-chips" role="group" aria-label="Show">${[["all", "All"], ["ready", "Ready"], ["none", "Not saved"]].map(([k, t]) => `<button type="button" class="os-chip" aria-pressed="${UI.listFilter === k}" data-oa="lf" data-k="${k}">${t}</button>`).join("")}${off ? "" : `<button type="button" class="os-chip os-sel" aria-pressed="${sel}" data-oa="selmode">${sel ? "Done" : "Select"}</button>`}</div>`
-      + (sel ? `<div class="os-row os-go"><span class="os-t"><b>${list.length ? list.length + " surah" + (list.length > 1 ? "s" : "") + " · " + fmt(costList(list)) : "Tap surahs to tick them"}</b></span><button type="button" class="os-btn os-pri" data-oa="godl" ${list.length ? "" : "disabled"}>Download</button></div>` : "");
+    el.innerHTML = (off ? `<div class="os-row">${ic("nowifi")}<span class="os-t"><b>${T("You're offline")}</b><small>${TN(nReady(), "{n} surah is ready", "{n} surahs are ready")}</small></span></div>`
+      : `<div class="os-row">${ic("cloud")}<span class="os-t"><b>${T("{n} of {total} ready offline", { n: nReady(), total: 114 })}</b><small>${T("{size} on this device", { size: fmt(onDevice()) })}</small></span><button type="button" class="os-btn" data-oa="lib">${T("Manage")}</button></div>`)
+      + `<div class="os-chips" role="group" aria-label="${T("Show")}">${[["all", T("All")], ["ready", T("Ready")], ["none", T("Not saved")]].map(([k, t]) => `<button type="button" class="os-chip" aria-pressed="${UI.listFilter === k}" data-oa="lf" data-k="${k}">${t}</button>`).join("")}${off ? "" : `<button type="button" class="os-chip os-sel" aria-pressed="${sel}" data-oa="selmode">${sel ? T("Done") : T("Select")}</button>`}</div>`
+      + (sel ? `<div class="os-row os-go"><span class="os-t"><b>${list.length ? nSurahs(list.length) + " · " + fmt(costList(list)) : T("Tap surahs to tick them")}</b></span><button type="button" class="os-btn os-pri" data-oa="godl" ${list.length ? "" : "disabled"}>${T("Download")}</button></div>` : "");
   }
 
   /* ---------- the cloud in the page header ---------- */
@@ -239,41 +242,43 @@ window.GQOff = (() => {
     const p = bs ? Math.min(1, bs.done / bs.tot) : 0;
     if (b.dataset.k !== `${busy}${Math.round(p * 100)}${st}`) { b.dataset.k = `${busy}${Math.round(p * 100)}${st}`;
       b.innerHTML = `<svg class="oi" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 18.5a4.2 4.2 0 0 1-.7-8.3A5.6 5.6 0 0 1 17.1 8.9 4.8 4.8 0 0 1 17.5 18.5H7z"/><path class="oi-a" d="M12 10.5v6M9.6 14.2 12 16.6l2.4-2.4"/><path class="oi-c" d="M9.2 13.6l2.2 2.2 3.8-4.2"/></svg>` + (busy ? ring(p, 15, "ob-ring") : ""); }
-    b.setAttribute("aria-label", busy ? `Offline: saving, ${Math.round(p * 100)} percent` : st === "ready" ? "Offline: this surah is ready" : "Offline: save this surah");
-    b.title = busy ? "Saving for offline" : st === "ready" ? "Ready offline" : "Save for offline";
+    b.setAttribute("aria-label", busy ? T("Offline: saving, {n} percent", { n: Math.round(p * 100) }) : st === "ready" ? T("Offline: this surah is ready") : T("Offline: save this surah"));
+    b.title = busy ? T("Saving for offline") : st === "ready" ? T("Ready offline") : T("Save for offline");
   }
 
+  const r0 = n => ST.s[n];
   /* ---------- the panel under the cloud: this surah only ---------- */
   function renderPop() {
     const el = $("#offpop"); if (!el || el.hidden) return; const n = api.cur(), st = state(n), s = surah(n), m = missing(n), ids = api.textIds();
     const rd = readMB(n), au = api.voices().reduce((a, v) => a + voiceMB(n, v), 0), r = ST.s[n];
-    const lib = `<div class="op-lib"><button type="button" class="lnk" data-oa="lib">Offline library ›</button></div>`;
+    const lib = `<div class="op-lib"><button type="button" class="lnk" data-oa="lib">${T("Offline library")} <span class="fwd">›</span></button></div>`;
+    const name = { name: esc(surahName(n)) }, hasAudio = !!Object.keys((r0(n) || {}).a || {}).length;
     let h;
     if (st === "busy" || st === "wait") {
       const bs = batchStats(), p = pct(n);
-      h = `<h4>${st === "busy" ? (Q.run ? "Saving " : "Paused: ") : "Waiting: "}${esc(s.en)}</h4><p data-d="pt">${st === "busy" ? `${p}% · ${fmt(Q.cost[n] || 0)}` : `Waits behind ${Q.list.indexOf(n)} other surah${Q.list.indexOf(n) > 1 ? "s" : ""}.`}</p>
+      h = `<h4>${st === "busy" ? (Q.run ? T("Saving {name}", name) : T("Paused: {name}", name)) : T("Waiting: {name}", name)}</h4><p data-d="pt">${st === "busy" ? `${pc(p)} · ${fmt(Q.cost[n] || 0)}` : TN(Q.list.indexOf(n), "Waits behind {n} other surah.", "Waits behind {n} other surahs.")}</p>
         <div class="op-bar"><i data-d="pb" style="width:${st === "busy" ? p : 0}%"></i></div>
-        <div class="op-act">${st === "busy" ? `<button type="button" class="ob" data-oa="${Q.run ? "pause" : "resume"}">${ic(Q.run ? "pause" : "play")}${Q.run ? "Pause" : "Resume"}</button>` : ""}<button type="button" class="ob" data-oa="unq" data-n="${n}">${ic("x")}${st === "busy" ? "Cancel this surah" : "Don't save"}</button></div>${lib}`;
+        <div class="op-act">${st === "busy" ? `<button type="button" class="ob" data-oa="${Q.run ? "pause" : "resume"}">${ic(Q.run ? "pause" : "play")}${Q.run ? T("Pause") : T("Resume")}</button>` : ""}<button type="button" class="ob" data-oa="unq" data-n="${n}">${ic("x")}${st === "busy" ? T("Cancel this surah") : T("Don't save")}</button></div>${lib}`;
     } else if (st === "ready") {
       const mis = !isComplete(n);
-      h = `<h4>${esc(s.en)} is ready offline</h4><p>${fmt(sizeOf(n))} on this device. ${Object.keys((r && r.a) || {}).length ? "Reads and plays" : "Reads"} with no internet.</p>
-        ${mis ? `<button type="button" class="ob pri wide" data-oa="upd" data-n="${n}">${ic("ear")}${m.voices.length && !m.text.length ? "Add listening" : "Update"} · ${fmt(costOf(n))}</button>` : ""}
-        <div class="op-act">${Object.keys((r && r.a) || {}).length ? `<button type="button" class="ob" data-oa="rml" data-n="${n}">${ic("ear")}Remove listening</button>` : ""}<button type="button" class="ob dng" data-oa="rm" data-n="${n}">${ic("trash")}Remove from this device</button></div>${lib}`;
+      h = `<h4>${T("{name} is ready offline", name)}</h4><p>${T("{size} on this device.", { size: fmt(sizeOf(n)) })} ${hasAudio ? T("Reads and plays with no internet.") : T("Reads with no internet.")}</p>
+        ${mis ? `<button type="button" class="ob pri wide" data-oa="upd" data-n="${n}">${ic("ear")}${m.voices.length && !m.text.length ? T("Add listening") : T("Update")} · ${fmt(costOf(n))}</button>` : ""}
+        <div class="op-act">${Object.keys((r && r.a) || {}).length ? `<button type="button" class="ob" data-oa="rml" data-n="${n}">${ic("ear")}${T("Remove listening")}</button>` : ""}<button type="button" class="ob dng" data-oa="rm" data-n="${n}">${ic("trash")}${T("Remove from this device")}</button></div>${lib}`;
     } else if (!ST.asked) {
-      h = `<h4>Save ${esc(s.en)} for offline</h4><p>It will open with no internet. Do you want to listen offline too?</p>
-        <div class="op-opts"><button type="button" class="opt ${ST.listen ? "" : "on"}" role="radio" aria-checked="${!ST.listen}" data-oa="ls0"><i class="rd"></i><span><b>Read only</b><small>Arabic and your translation</small></span><em>${fmt(rd)}</em></button>
-        <button type="button" class="opt ${ST.listen ? "on" : ""}" role="radio" aria-checked="${ST.listen}" data-oa="ls1"><i class="rd"></i><span><b>Read and listen<span class="tag">Suggested</span></b><small>Plus the recitation by ${listenHtml()}</small></span><em>${fmt(rd + au)}</em></button></div>
-        <button type="button" class="ob pri wide" data-oa="save" data-n="${n}">${ic("cloud")}Save · ${fmt(rd + (ST.listen ? au : 0))}</button>
-        <p class="op-note">${ic("sel")}Asked once. Change it any time in the Offline library.</p>${lib}`;
+      h = `<h4>${T("Save {name} for offline", name)}</h4><p>${T("It will open with no internet. Do you want to listen offline too?")}</p>
+        <div class="op-opts"><button type="button" class="opt ${ST.listen ? "" : "on"}" role="radio" aria-checked="${!ST.listen}" data-oa="ls0"><i class="rd"></i><span><b>${T("Read only")}</b><small>${T("Arabic and your translation")}</small></span><em>${fmt(rd)}</em></button>
+        <button type="button" class="opt ${ST.listen ? "on" : ""}" role="radio" aria-checked="${ST.listen}" data-oa="ls1"><i class="rd"></i><span><b>${T("Read and listen")}<span class="tag">${T("Suggested")}</span></b><small>${T("Plus the recitation by {voices}", { voices: listenHtml() })}</small></span><em>${fmt(rd + au)}</em></button></div>
+        <button type="button" class="ob pri wide" data-oa="save" data-n="${n}">${ic("cloud")}${T("Save")} · ${fmt(rd + (ST.listen ? au : 0))}</button>
+        <p class="op-note">${ic("sel")}${T("Asked once. Change it any time in the Offline library.")}</p>${lib}`;
     } else {
-      h = `<h4>Save ${esc(s.en)} for offline</h4><p>${ST.listen ? "Reads and plays" : "Reads"} with no internet.</p>
-        <div class="op-line">${ic("check")}<span><b>${ST.listen ? "Read and listen" : "Read only"}</b><small>${ST.listen ? listenHtml() : "Arabic and your translation"}</small></span><em>${fmt(costOf(n))}</em></div>
-        <button type="button" class="ob pri wide" data-oa="save" data-n="${n}">${ic("cloud")}Save · ${fmt(costOf(n))}</button>${lib}`;
+      h = `<h4>${T("Save {name} for offline", name)}</h4><p>${ST.listen ? T("Reads and plays with no internet.") : T("Reads with no internet.")}</p>
+        <div class="op-line">${ic("check")}<span><b>${ST.listen ? T("Read and listen") : T("Read only")}</b><small>${ST.listen ? listenHtml() : T("Arabic and your translation")}</small></span><em>${fmt(costOf(n))}</em></div>
+        <button type="button" class="ob pri wide" data-oa="save" data-n="${n}">${ic("cloud")}${T("Save")} · ${fmt(costOf(n))}</button>${lib}`;
     }
-    if (!online() && st === "none") h += `<p class="op-note">${ic("nowifi")}You are offline. Saving starts when the connection returns.</p>`;
+    if (!online() && st === "none") h += `<p class="op-note">${ic("nowifi")}${T("You are offline. Saving starts when the connection returns.")}</p>`;
     const key = h.replace(/(data-d="pt">)[^<]*/, "$1").replace(/(data-d="pb" style="width:)[\d.]+/, "$1");   // progress alone never redraws the panel (a click on its buttons would be lost)
     if (el.dataset.h !== key) { el.dataset.h = key; const f = document.activeElement && el.contains(document.activeElement) ? document.activeElement.dataset.oa : ""; el.innerHTML = h; if (f) { const x = $(`[data-oa="${f}"]`, el); x && x.focus({ preventScroll: true }); } }
-    else { const t = $("[data-d=pt]", el), b = $("[data-d=pb]", el); if (t && state(n) === "busy") t.textContent = `${pct(n)}% · ${fmt(Q.cost[n] || 0)}`; if (b) b.style.width = (state(n) === "busy" ? pct(n) : 0) + "%"; }
+    else { const t = $("[data-d=pt]", el), b = $("[data-d=pb]", el); if (t && state(n) === "busy") t.textContent = `${pc(pct(n))} · ${fmt(Q.cost[n] || 0)}`; if (b) b.style.width = (state(n) === "busy" ? pct(n) : 0) + "%"; }
   }
 
   /* ---------- the progress card in the book ---------- */
@@ -281,11 +286,12 @@ window.GQOff = (() => {
     const el = $("#offdock"); if (!el) return; const b = Q.batch, bs = batchStats();
     if (!b) { el.hidden = true; return; } el.hidden = false;
     let h;
-    if (b.complete && !Q.list.length) h = `<span class="od-i">${ic("check")}</span><span class="od-t"><b>All ready</b>${b.n} surah${b.n > 1 ? "s" : ""} now work with no internet</span><i class="od-ln" style="width:100%"></i>`;
-    else if (Q.err) h = `<span class="od-i err">${ic(Q.err.kind === "space" ? "alert" : "wifi")}</span><span class="od-t"><b>${Q.err.kind === "space" ? "Not enough space" : "No connection"}</b>${Q.err.kind === "space" ? "Free some room, then try again. What is saved stays." : `Paused at ${Math.round(bs.done / bs.tot * 100)}%. It carries on where it stopped.`}</span><button type="button" class="od-b txt" data-oa="resume">Retry</button><button type="button" class="od-b" data-oa="cancel" aria-label="Cancel">${ic("x")}</button><i class="od-ln err" style="width:${bs.done / bs.tot * 100}%"></i>`;
+    if (b.complete && !Q.list.length) h = `<span class="od-i">${ic("check")}</span><span class="od-t"><b>${T("All ready")}</b>${TN(b.n, "{n} surah now works with no internet", "{n} surahs now work with no internet")}</span><i class="od-ln" style="width:100%"></i>`;
+    else if (Q.err) h = `<span class="od-i err">${ic(Q.err.kind === "space" ? "alert" : "wifi")}</span><span class="od-t"><b>${Q.err.kind === "space" ? T("Not enough space") : T("No connection")}</b>${Q.err.kind === "space" ? T("Free some room, then try again. What is saved stays.") : T("Paused at {pct}. It carries on where it stopped.", { pct: pc(Math.round(bs.done / bs.tot * 100)) })}</span><button type="button" class="od-b txt" data-oa="resume">${T("Retry")}</button><button type="button" class="od-b" data-oa="cancel" aria-label="${T("Cancel")}">${ic("x")}</button><i class="od-ln err" style="width:${bs.done / bs.tot * 100}%"></i>`;
     else {
       const eta = Math.max(1, Math.round(bs.left / 4 / 60 * 10) / 10), cur = Q.list[0] ? surahName(Q.list[0]) : "";
-      h = `<span class="od-i">${ic("cloud")}</span><span class="od-t"><b>${Q.run ? "Saving" : "Paused"} ${bs.idx} of ${bs.n} · ${Math.round(bs.done / bs.tot * 100)}%</b>${fmt(bs.done)} of ${fmt(bs.tot)} · ${Q.run ? "~" + (eta < 1.5 ? "1 min" : Math.round(eta) + " min") + " left" : "tap resume to continue"}</span><button type="button" class="od-b" data-oa="${Q.run ? "pause" : "resume"}" aria-label="${Q.run ? "Pause" : "Resume"}">${ic(Q.run ? "pause" : "play")}</button><button type="button" class="od-b" data-oa="cancel" aria-label="Cancel">${ic("x")}</button><i class="od-ln" style="width:${bs.done / bs.tot * 100}%"></i>`;
+      const at = { i: bs.idx, total: bs.n, pct: pc(Math.round(bs.done / bs.tot * 100)) };
+      h = `<span class="od-i">${ic("cloud")}</span><span class="od-t"><b>${Q.run ? T("Saving {i} of {total} · {pct}", at) : T("Paused {i} of {total} · {pct}", at)}</b>${T("{done} of {total}", { done: fmt(bs.done), total: fmt(bs.tot) })} · ${Q.run ? T("about {n} min left", { n: eta < 1.5 ? 1 : Math.round(eta) }) : T("tap resume to continue")}</span><button type="button" class="od-b" data-oa="${Q.run ? "pause" : "resume"}" aria-label="${Q.run ? T("Pause") : T("Resume")}">${ic(Q.run ? "pause" : "play")}</button><button type="button" class="od-b" data-oa="cancel" aria-label="${T("Cancel")}">${ic("x")}</button><i class="od-ln" style="width:${bs.done / bs.tot * 100}%"></i>`;
     }
     el.classList.toggle("err", !!Q.err);
     const key = h.replace(/(<span class="od-t">)[\s\S]*?(<\/span>(?:<button|<i))/, "$1$2").replace(/style="width:[\d.]+%"/, "");   // progress alone only moves the bar and the words: the buttons are never redrawn under a pointer
@@ -301,57 +307,57 @@ window.GQOff = (() => {
     const st = state(n), p = st === "busy" ? Q.prog[n] || 0 : 0, C = 2 * Math.PI * 19, mis = st === "ready" && !isComplete(n);
     const svg = st === "busy" ? `<svg viewBox="0 0 42 42" aria-hidden="true"><circle class="t" cx="21" cy="21" r="19"/><circle class="v" cx="21" cy="21" r="19" stroke-dasharray="${C}" stroke-dashoffset="${C * (1 - p)}" transform="rotate(-90 21 21)"/></svg>`
       : st === "wait" ? `<svg viewBox="0 0 42 42" aria-hidden="true"><circle class="t" cx="21" cy="21" r="19" stroke-dasharray="3 4.4"/></svg>` : st === "ready" ? `<svg viewBox="0 0 42 42" aria-hidden="true"><circle class="f" cx="21" cy="21" r="21"/></svg>` : `<svg viewBox="0 0 42 42" aria-hidden="true"><circle class="t" cx="21" cy="21" r="19"/></svg>`;
-    return `<button type="button" class="lt ${st} ${SEL.has(n) ? "sel" : ""}" data-oa="${st === "ready" ? "menu" : st === "none" ? "tick" : "tq"}" data-n="${n}" aria-pressed="${SEL.has(n)}" aria-label="${esc(surahName(n))}, ${st === "ready" ? "ready offline" : st === "busy" ? "saving" : st === "wait" ? "waiting" : "not saved"}"><span class="lt-t">${ic("check")}</span><span class="lt-r">${svg}<b>${n}</b></span><span class="lt-n">${esc(surahName(n))}</span><span class="lt-z">${st === "ready" ? fmt(sizeOf(n)) : fmt(costOf(n))}${mis ? " ·" : ""}</span></button>`;
+    return `<button type="button" class="lt ${st} ${SEL.has(n) ? "sel" : ""}" data-oa="${st === "ready" ? "menu" : st === "none" ? "tick" : "tq"}" data-n="${n}" aria-pressed="${SEL.has(n)}" aria-label="${esc(surahName(n))}, ${st === "ready" ? T("Ready offline") : st === "busy" ? T("Saving") : st === "wait" ? T("Waiting") : T("Not saved")}"><span class="lt-t">${ic("check")}</span><span class="lt-r">${svg}<b>${N(n)}</b></span><span class="lt-n">${esc(surahName(n))}</span><span class="lt-z">${st === "ready" ? fmt(sizeOf(n)) : fmt(costOf(n))}${mis ? " ·" : ""}</span></button>`;
   }
-  const lackNames = list => { const ids = new Set(); list.forEach(n => missing(n).voices.forEach(v => ids.add(v.id))); return ids.size ? api.voices().filter(v => ids.has(v.id)).map(v => v.name).join(" + ") : "listening"; };
+  const lackNames = list => { const ids = new Set(); list.forEach(n => missing(n).voices.forEach(v => ids.add(v.id))); return ids.size ? api.voices().filter(v => ids.has(v.id)).map(v => v.name).join(" + ") : T("listening"); };
   /* the Listen row: collapsed it names the voices that get saved; open it shows each voice, how many saved surahs have it, and the way to change them */
   function lisRow() {
     const vs = api.voices(), on = ST.listen, open = UI.lisOpen && on, total = nReady();
     const lack = needUpdate().filter(n => missing(n).voices.length), others = savedVoices().filter(id => !vs.some(v => v.id === id));
-    const head = `<div class="ol-row ol-lh"><button type="button" class="lis-t" data-oa="lisx" aria-expanded="${open}" aria-controls="lisBody" ${on ? "" : "disabled"}>${ic("ear", "i")}<span class="t"><b>Listen</b><small>${on ? "Saves" + api.voices().map(v => `<span class="vl">${vh(v.name, v.native)}</span>`).join("") : "Off: surahs read offline only"}</small></span>${on ? ic("chev", "chv") : ""}</button><button type="button" class="sw ${on ? "on" : ""}" role="switch" aria-checked="${on}" aria-label="Listen offline" data-oa="lsw"></button></div>`;
+    const head = `<div class="ol-row ol-lh"><button type="button" class="lis-t" data-oa="lisx" aria-expanded="${open}" aria-controls="lisBody" ${on ? "" : "disabled"}>${ic("ear", "i")}<span class="t"><b>${T("Listen")}</b><small>${on ? T("Saves") + api.voices().map(v => `<span class="vl">${vh(v.name, v.native)}</span>`).join("") : T("Off: surahs read offline only")}</small></span>${on ? ic("chev", "chv") : ""}</button><button type="button" class="sw ${on ? "on" : ""}" role="switch" aria-checked="${on}" aria-label="${T("Listen offline")}" data-oa="lsw"></button></div>`;
     if (!open) return `<div class="ol-lis">${head}</div>`;
-    const rows = vs.map(v => { const c = voiceCount(v.id), fresh = total && !c; return `<div class="lv"><span class="t"><b>${vh(v.name, v.native)}${fresh ? `<span class="tag">New</span>` : ""}</b><small>${v.role === "tr" ? "Translation voice" : "Quran recitation"}</small></span><em class="${total && c < total ? "part" : ""}">${total ? c + " of " + total : ""}</em></div>`; }).join("");
-    const oth = others.map(id => `<div class="lv old"><span class="t"><b>${vh(api.voiceName(id), api.voiceNative(id))}</b><small>Still saved · ${voiceCount(id)} surah${voiceCount(id) === 1 ? "" : "s"} · ${fmt(voiceOnDevice(id))}</small></span><button type="button" class="ob sm dng" data-oa="vrm" data-k="${esc(id)}">Remove</button></div>`).join("");
-    return `<div class="ol-lis open">${head}<div class="lis-b" id="lisBody"><p class="lis-n">Saved surahs include the voices you have chosen now. To save others, change your voices, then add them.</p>${rows}
-      ${lack.length ? `<button type="button" class="ob pri wide" data-oa="updall">${ic("cloud")}Add to ${lack.length} surah${lack.length > 1 ? "s" : ""} · ${fmt(costList(lack))}</button>` : ""}
-      <button type="button" class="ob wide" data-oa="vopen">${ic("swap")}Change voices</button>${oth ? `<h5>Also on this device</h5>${oth}` : ""}</div></div>`;
+    const rows = vs.map(v => { const c = voiceCount(v.id), fresh = total && !c; return `<div class="lv"><span class="t"><b>${vh(v.name, v.native)}${fresh ? `<span class="tag">${T("New")}</span>` : ""}</b><small>${v.role === "tr" ? T("Translation voice") : T("Quran recitation")}</small></span><em class="${total && c < total ? "part" : ""}">${total ? T("{done} of {total}", { done: c, total }) : ""}</em></div>`; }).join("");
+    const oth = others.map(id => `<div class="lv old"><span class="t"><b>${vh(api.voiceName(id), api.voiceNative(id))}</b><small>${T("Still saved")} · ${nSurahs(voiceCount(id))} · ${fmt(voiceOnDevice(id))}</small></span><button type="button" class="ob sm dng" data-oa="vrm" data-k="${esc(id)}">${T("Remove")}</button></div>`).join("");
+    return `<div class="ol-lis open">${head}<div class="lis-b" id="lisBody"><p class="lis-n">${T("Saved surahs include the voices you have chosen now. To save others, change your voices, then add them.")}</p>${rows}
+      ${lack.length ? `<button type="button" class="ob pri wide" data-oa="updall">${ic("cloud")}${TN(lack.length, "Add to {n} surah", "Add to {n} surahs")} · ${fmt(costList(lack))}</button>` : ""}
+      <button type="button" class="ob wide" data-oa="vopen">${ic("swap")}${T("Change voices")}</button>${oth ? `<h5>${T("Also on this device")}</h5>${oth}` : ""}</div></div>`;
   }
   /* the "Change voices" sheet: the player's own two lists. The Quran list is long, so it has search, and what you chose and what is already saved come first. */
   function vsList() {
-    const L = api.voiceLists(), saved = new Set(savedVoices()), q = VS.q.trim().toLowerCase(), hit = nm => !q || nm.toLowerCase().includes(q);   // a search matches the English name and the own-language name
-    const row = (kind, id, name, cur, sub, native) => `<button type="button" class="vo ${cur ? "on" : ""}" role="radio" aria-checked="${cur}" tabindex="${cur ? 0 : -1}" data-oa="vpick" data-t="${kind}" data-k="${esc(id)}"><i class="rd"></i><span><b>${esc(name)}</b>${nat(native)}${sub || saved.has(id) ? `<small>${esc(sub || "Saved on this device")}</small>` : ""}</span></button>`;
+    const L = api.voiceLists(), saved = new Set(savedVoices()), q = api.fold(VS.q.trim()), hit = nm => !q || api.fold(nm).includes(q);   // a search matches the English name and the own-language name
+    const row = (kind, id, name, cur, sub, native) => `<button type="button" class="vo ${cur ? "on" : ""}" role="radio" aria-checked="${cur}" tabindex="${cur ? 0 : -1}" data-oa="vpick" data-t="${kind}" data-k="${esc(id)}"><i class="rd"></i><span><b>${esc(name)}</b>${nat(native)}${sub || saved.has(id) ? `<small>${esc(sub || T("Saved on this device"))}</small>` : ""}</span></button>`;
     const head = (t, nv) => `<h6>${esc(t)}${nat(nv)}</h6>`; let h = "", n = 0;
     if (VS.tab === "quran") {
       const cur = L.quran.cur, items = L.quran.items, by = id => items.find(x => x.id === id);
-      if (!q || hit("none translation only")) { h += row("q", "", "None (translation only)", cur === "", ""); n++; }
+      if (!q || hit("none translation only " + T("None (translation only)"))) { h += row("q", "", T("None (translation only)"), cur === "", ""); n++; }
       const first = q ? [] : [cur, ...[...saved].filter(id => id !== cur)].filter(id => by(id));   // searching shows one plain list of matches
-      if (first.length) { h += head(q ? "Matches" : "Chosen and saved") + first.map(id => row("q", id, by(id).name, id === cur, "", by(id).native)).join(""); n += first.length; }
+      if (first.length) { h += head(q ? T("Matches") : T("Chosen and saved")) + first.map(id => row("q", id, by(id).name, id === cur, "", by(id).native)).join(""); n += first.length; }
       const rest = items.filter(x => !first.includes(x.id) && hit(x.name + " " + x.native));
-      if (rest.length) { h += head(first.length ? "All reciters" : q ? "Matches" : "Reciters") + rest.map(x => row("q", x.id, x.name, false, "", x.native)).join(""); n += rest.length; }
+      if (rest.length) { h += head(first.length ? T("All reciters") : q ? T("Matches") : T("Reciters")) + rest.map(x => row("q", x.id, x.name, false, "", x.native)).join(""); n += rest.length; }
     } else {
       const cur = L.tr.cur;
-      if (hit("auto")) { h += row("t", "auto", "Auto", cur === "auto", L.tr.auto ? "Follows your translation language: " + L.tr.auto : "None for your translation language"); n++; }
-      if (hit("none")) { h += row("t", "", "None", cur === "", ""); n++; }
+      if (hit("auto " + T("Auto"))) { h += row("t", "auto", T("Auto"), cur === "auto", L.tr.auto ? T("Follows your translation language: {voice}", { voice: L.tr.auto }) : T("None for your translation language")); n++; }
+      if (hit("none " + T("None"))) { h += row("t", "", T("None"), cur === "", ""); n++; }
       L.tr.groups.slice().sort((a, b) => a.label.localeCompare(b.label)).forEach(g => { const it = g.items.filter(x => hit(x.name + " " + x.native) || hit(g.label + " " + g.native)); if (it.length) { h += head(g.label, g.native) + it.map(x => row("t", x.id, x.name, x.id === cur, "", x.native)).join(""); n += it.length; } });
     }
-    return n ? h : `<p class="op-note">No voice matches "${esc(VS.q)}".</p>`;
+    return n ? h : `<p class="op-note">${esc(T("No voice matches “{q}”.", { q: VS.q }))}</p>`;
   }
   function vsRender() {
     const m = $("#offmini"), list = $("#ovList"); if (!m || !list || !VS.open) return;
     const f = document.activeElement && m.contains(document.activeElement) ? document.activeElement.dataset : null, sc = list.scrollTop;
     list.innerHTML = vsList(); list.scrollTop = sc; if (!$(".vo.on", list)) { const x = $(".vo", list); x && (x.tabIndex = 0); }
     $$("#ovTabs [data-k]", m).forEach(b => { const on = b.dataset.k === VS.tab; b.setAttribute("aria-selected", on); b.tabIndex = on ? 0 : -1; });
-    $("#ovQ").placeholder = VS.tab === "quran" ? "Search reciters" : "Search translation voices"; $("#ovQ").setAttribute("aria-label", $("#ovQ").placeholder);
-    const w = $("#ovNow"); w.innerHTML = `<b>Saved surahs get</b> ${listenHtml()}`;
+    $("#ovQ").placeholder = VS.tab === "quran" ? T("Search reciters") : T("Search translation voices"); $("#ovQ").setAttribute("aria-label", $("#ovQ").placeholder);
+    const w = $("#ovNow"); w.innerHTML = `<b>${T("Saved surahs get")}</b> ${listenHtml()}`;
     if (f && f.oa === "vpick") { const x = $$("#ovList [data-oa=vpick]").find(b => b.dataset.k === f.k && b.dataset.t === f.t); x && x.focus({ preventScroll: true }); }
   }
   function voiceSheet() {
     VS.open = true; VS.q = "";
-    mini(`<div class="vs-h"><h4>Change voices</h4></div><p>These are the player's own voices, so the reader changes too. Pick what you want saved.</p>
-      <div class="vs-tabs" id="ovTabs" role="tablist"><button type="button" role="tab" data-oa="vtab" data-k="quran">Quran recitation</button><button type="button" role="tab" data-oa="vtab" data-k="tr">Translation voice</button></div>
+    mini(`<div class="vs-h"><h4>${T("Change voices")}</h4></div><p>${T("These are the player's own voices, so the reader changes too. Pick what you want saved.")}</p>
+      <div class="vs-tabs" id="ovTabs" role="tablist"><button type="button" role="tab" data-oa="vtab" data-k="quran">${T("Quran recitation")}</button><button type="button" role="tab" data-oa="vtab" data-k="tr">${T("Translation voice")}</button></div>
       <input id="ovQ" class="vs-q" type="search" autocomplete="off" spellcheck="false">
-      <div class="vs-list" id="ovList" role="radiogroup" aria-label="Voices"></div>
-      <div class="vs-foot"><span id="ovNow"></span><button type="button" class="ob pri" data-oa="mclose">Done</button></div>`);
+      <div class="vs-list" id="ovList" role="radiogroup" aria-label="${T("Voices")}"></div>
+      <div class="vs-foot"><span id="ovNow"></span><button type="button" class="ob pri" data-oa="mclose">${T("Done")}</button></div>`);
     $("#offmini").classList.add("sheet"); vsRender(); const t = $("#ovTabs [aria-selected=true]"); t && t.focus({ preventScroll: true });
   }
   function renderLib() {
@@ -360,37 +366,37 @@ window.GQOff = (() => {
     const allNeed = allN().filter(n => !isComplete(n)), readNeed = allN().filter(n => !isComplete(n) && (ST.s[n] || Q.list.includes(n) || touched(n)));
     const eq = a => SEL.size === a.length && a.length && a.every(n => SEL.has(n));
     const lis = ST.listen ? api.voices() : [];
-    const side = `<div class="ol-sum"><div class="big">${fmt(onDevice())} <small>on this device</small></div>
+    const side = `<div class="ol-sum"><div class="big">${fmt(onDevice())} <small>${T("on this device")}</small></div>
       <div class="stack"><i class="a" style="width:${Math.min(100, readOnDevice() / Math.max(onDevice(), .01) * 100)}%"></i></div>
-      <div class="key"><span><i class="a"></i>Reading ${fmt(readOnDevice())}</span><span><i class="b"></i>Listening ${fmt(onDevice() - readOnDevice())}</span></div>
-      <small>${nReady()} of 114 surahs ready · ${nListen()} with listening${FREE != null ? " · " + fmt(FREE) + " free" : ""}</small></div>
-      ${upd.length && !(UI.lisOpen && ST.listen && upd.every(n => !missing(n).text.length && !missing(n).read)) ? `<div class="ol-ban">${ic("ear")}<span><b>${upd.length} ready surah${upd.length > 1 ? "s" : ""} ${upd.every(n => !missing(n).text.length && !missing(n).read) ? (upd.length > 1 ? "have" : "has") + " no " + esc(lackNames(upd)) + " yet" : (upd.length > 1 ? "need" : "needs") + " an update"}</b><small>${upd.every(n => !missing(n).text.length) ? "Add the recitation" : "Add what is missing"} · ${fmt(costList(upd))}</small></span><button type="button" class="ob" data-oa="updall">Add</button></div>` : ""}
-      <h3>Quick picks</h3>
-      <div class="ol-picks"><button type="button" class="pk ${eq(allNeed) ? "on" : ""}" data-oa="pick" data-k="all" ${allNeed.length ? "" : "disabled"}><span><b>Whole Quran</b><small>${allNeed.length ? allNeed.length + " surah" + (allNeed.length > 1 ? "s" : "") + " to save" : "All ready"}</small></span><em>${allNeed.length ? fmt(costList(allNeed)) : ""}</em></button>
-      <button type="button" class="pk ${eq(readNeed) ? "on" : ""}" data-oa="pick" data-k="read" ${readNeed.length ? "" : "disabled"}><span><b>The ones I read</b><small>${readNeed.length ? readNeed.length + " you opened, played or saved" : "Nothing new yet"}</small></span><em>${readNeed.length ? fmt(costList(readNeed)) : ""}</em></button></div>
-      <h3>What to keep</h3>
-      <div class="ol-row ol-read">${ic("text", "i")}<span class="t"><b>Read</b><small>Arabic, your translation, page fonts</small></span><i class="sw lock" aria-hidden="true"></i></div>
+      <div class="key"><span><i class="a"></i>${T("Reading {size}", { size: fmt(readOnDevice()) })}</span><span><i class="b"></i>${T("Listening {size}", { size: fmt(onDevice() - readOnDevice()) })}</span></div>
+      <small>${T("{n} of {total} surahs ready", { n: nReady(), total: 114 })} · ${T("{n} with listening", { n: nListen() })}${FREE != null ? " · " + T("{size} free", { size: fmt(FREE) }) : ""}</small></div>
+      ${upd.length && !(UI.lisOpen && ST.listen && upd.every(n => !missing(n).text.length && !missing(n).read)) ? `<div class="ol-ban">${ic("ear")}<span><b>${upd.every(n => !missing(n).text.length && !missing(n).read) ? TN(upd.length, "{n} ready surah has no {voice} yet", "{n} ready surahs have no {voice} yet", { voice: esc(lackNames(upd)) }) : TN(upd.length, "{n} ready surah needs an update", "{n} ready surahs need an update")}</b><small>${upd.every(n => !missing(n).text.length) ? T("Add the recitation") : T("Add what is missing")} · ${fmt(costList(upd))}</small></span><button type="button" class="ob" data-oa="updall">${T("Add")}</button></div>` : ""}
+      <h3>${T("Quick picks")}</h3>
+      <div class="ol-picks"><button type="button" class="pk ${eq(allNeed) ? "on" : ""}" data-oa="pick" data-k="all" ${allNeed.length ? "" : "disabled"}><span><b>${T("Whole Quran")}</b><small>${allNeed.length ? TN(allNeed.length, "{n} surah to save", "{n} surahs to save") : T("All ready")}</small></span><em>${allNeed.length ? fmt(costList(allNeed)) : ""}</em></button>
+      <button type="button" class="pk ${eq(readNeed) ? "on" : ""}" data-oa="pick" data-k="read" ${readNeed.length ? "" : "disabled"}><span><b>${T("The ones I read")}</b><small>${readNeed.length ? T("{n} you opened, played or saved", { n: readNeed.length }) : T("Nothing new yet")}</small></span><em>${readNeed.length ? fmt(costList(readNeed)) : ""}</em></button></div>
+      <h3>${T("What to keep")}</h3>
+      <div class="ol-row ol-read">${ic("text", "i")}<span class="t"><b>${T("Read")}</b><small>${T("Arabic, your translation, page fonts")}</small></span><i class="sw lock" aria-hidden="true"></i></div>
       ${lisRow()}
-      <h3>Automatic</h3>
-      <div class="ol-row">${ic("wifi", "i")}<span class="t"><b>Keep what I read ready</b><small>New surahs you open or play save themselves on Wi-Fi</small></span><button type="button" class="sw ${ST.auto ? "on" : ""}" role="switch" aria-checked="${ST.auto}" aria-label="Keep what I read ready" data-oa="auto"></button></div>
-      <p class="op-note">${ic("wifi")}Wi-Fi is best for big downloads. It pauses by itself if the connection drops and carries on where it stopped.</p>
-      ${nReady() ? `<button type="button" class="lnk dng" data-oa="rmall">Remove everything from this device</button>` : ""}`;
-    const T = allN().filter(n => UI.filter === "ready" ? isReady(n) : UI.filter === "none" ? !isReady(n) : UI.filter === "sel" ? SEL.has(n) : true);
-    const prog = bs && !bs.complete ? `<div class="ol-prog"><span><b data-d="lp1">${Q.err ? "Paused" : Q.run ? "Downloading" : "Paused"} · ${Math.round(bs.done / bs.tot * 100)}%</b><small data-d="lp2">${libProgSub(bs)}</small><div class="stack"><i class="a" data-d="lpb" style="width:${bs.done / bs.tot * 100}%"></i></div></span><button type="button" class="ob" data-oa="${Q.run ? "pause" : "resume"}">${ic(Q.run ? "pause" : "play")}${Q.run ? "Pause" : "Resume"}</button><button type="button" class="ob" data-oa="cancel">Cancel</button></div>` : "";
-    const tb = `<div class="ol-tb"><div class="seg" role="group" aria-label="Show">${[["all", "All"], ["ready", "Ready"], ["none", "Not saved"], ["sel", "Ticked"]].map(([k, t]) => `<button type="button" aria-pressed="${UI.filter === k}" data-oa="lflt" data-k="${k}">${t}</button>`).join("")}</div><button type="button" class="ob sm" data-oa="clr" ${SEL.size ? "" : "disabled"}>Clear ticks</button><span class="ol-hint">Tap a surah to tick it</span></div>
-      <div class="ol-leg"><span><i class="a"></i>Ready offline</span><span><i class="c"></i>Not saved</span></div>`;
-    const foot = `<span class="of-t"><b data-d="lf1">${Q.list.length ? `Saving ${bs.idx} of ${bs.n}` : pend.length ? `${pend.length} surah${pend.length > 1 ? "s" : ""} · ${fmt(cost)}` : "Nothing new to save"}</b><small>${fmt(onDevice())} on this device${FREE != null ? " · " + fmt(FREE) + " free" : ""}</small></span><button type="button" class="ob" data-oa="libx">Close</button>${Q.list.length ? `<button type="button" class="ob" data-oa="${Q.run ? "pause" : "resume"}">${Q.run ? "Pause" : "Resume"}</button>` : `<button type="button" class="ob pri" data-oa="godl" ${pend.length ? "" : "disabled"}>${ic("cloud")}Download${pend.length ? " " + fmt(cost) : ""}</button>`}`;
-    $("#olSub").textContent = `${nReady()} of 114 ready · ${fmt(onDevice())}`;
+      <h3>${T("Automatic")}</h3>
+      <div class="ol-row">${ic("wifi", "i")}<span class="t"><b>${T("Keep what I read ready")}</b><small>${T("New surahs you open or play save themselves on Wi-Fi")}</small></span><button type="button" class="sw ${ST.auto ? "on" : ""}" role="switch" aria-checked="${ST.auto}" aria-label="${T("Keep what I read ready")}" data-oa="auto"></button></div>
+      <p class="op-note">${ic("wifi")}${T("Wi-Fi is best for big downloads. It pauses by itself if the connection drops and carries on where it stopped.")}</p>
+      ${nReady() ? `<button type="button" class="lnk dng" data-oa="rmall">${T("Remove everything from this device")}</button>` : ""}`;
+    const LIST = allN().filter(n => UI.filter === "ready" ? isReady(n) : UI.filter === "none" ? !isReady(n) : UI.filter === "sel" ? SEL.has(n) : true);
+    const prog = bs && !bs.complete ? `<div class="ol-prog"><span><b data-d="lp1">${Q.err ? T("Paused") : Q.run ? T("Downloading") : T("Paused")} · ${pc(Math.round(bs.done / bs.tot * 100))}</b><small data-d="lp2">${libProgSub(bs)}</small><div class="stack"><i class="a" data-d="lpb" style="width:${bs.done / bs.tot * 100}%"></i></div></span><button type="button" class="ob" data-oa="${Q.run ? "pause" : "resume"}">${ic(Q.run ? "pause" : "play")}${Q.run ? T("Pause") : T("Resume")}</button><button type="button" class="ob" data-oa="cancel">${T("Cancel")}</button></div>` : "";
+    const tb = `<div class="ol-tb"><div class="seg" role="group" aria-label="${T("Show")}">${[["all", T("All")], ["ready", T("Ready")], ["none", T("Not saved")], ["sel", T("Ticked")]].map(([k, t]) => `<button type="button" aria-pressed="${UI.filter === k}" data-oa="lflt" data-k="${k}">${t}</button>`).join("")}</div><button type="button" class="ob sm" data-oa="clr" ${SEL.size ? "" : "disabled"}>${T("Clear ticks")}</button><span class="ol-hint">${T("Tap a surah to tick it")}</span></div>
+      <div class="ol-leg"><span><i class="a"></i>${T("Ready offline")}</span><span><i class="c"></i>${T("Not saved")}</span></div>`;
+    const foot = `<span class="of-t"><b data-d="lf1">${Q.list.length ? T("Saving {i} of {total}", { i: bs.idx, total: bs.n }) : pend.length ? `${nSurahs(pend.length)} · ${fmt(cost)}` : T("Nothing new to save")}</b><small>${T("{size} on this device", { size: fmt(onDevice()) })}${FREE != null ? " · " + T("{size} free", { size: fmt(FREE) }) : ""}</small></span><button type="button" class="ob" data-oa="libx">${T("Close")}</button>${Q.list.length ? `<button type="button" class="ob" data-oa="${Q.run ? "pause" : "resume"}">${Q.run ? T("Pause") : T("Resume")}</button>` : `<button type="button" class="ob pri" data-oa="godl" ${pend.length ? "" : "disabled"}>${ic("cloud")}${T("Download")}${pend.length ? " " + fmt(cost) : ""}</button>`}`;
+    $("#olSub").textContent = `${T("{n} of {total} ready", { n: nReady(), total: 114 })} · ${fmt(onDevice())}`;
     const f = document.activeElement && el.contains(document.activeElement) ? [document.activeElement.dataset.oa, document.activeElement.dataset.n, document.activeElement.dataset.k] : null;
     const put = (sel, html, key) => { const x = $(sel); key = key == null ? html : key; if (x.dataset.h === key) return; x.dataset.h = key; const sc = x.scrollTop; x.innerHTML = html; x.scrollTop = sc; };
     const dyn = h => h.replace(/(data-d="l[a-z0-9]+">)[^<]*/g, "$1").replace(/style="width:[\d.]+%"/g, "");   // numbers that move while saving never count as a change
     put("#olSide", side); put("#olProg", prog, dyn(prog)); put("#olTb", tb); put("#olFoot", foot, dyn(foot));
-    const g = $("#olGrid"), tiles = T.map(tile), order = T.join();   // a tile is replaced only when it changed; the grid keeps its scroll and its focus
-    if (g.dataset.o !== order) { g.dataset.o = order; g.innerHTML = tiles.join("") || `<p class="op-note">Nothing here.</p>`; g._t = tiles; }
+    const g = $("#olGrid"), tiles = LIST.map(tile), order = LIST.join();   // a tile is replaced only when it changed; the grid keeps its scroll and its focus
+    if (g.dataset.o !== order) { g.dataset.o = order; g.innerHTML = tiles.join("") || `<p class="op-note">${T("Nothing here.")}</p>`; g._t = tiles; }
     else tiles.forEach((h, i) => { if (g._t[i] !== h) { const tmp = document.createElement("div"); tmp.innerHTML = h; g.children[i].replaceWith(tmp.firstChild); } }), g._t = tiles;
     if (f && f[0]) { const x = $$(`#offlib [data-oa="${f[0]}"]`).find(b => (b.dataset.n || "") === (f[1] || "") && (b.dataset.k || "") === (f[2] || "")); x && x.focus({ preventScroll: true }); }
   }
-  const libProgSub = bs => `${fmt(bs.done)} of ${fmt(bs.tot)} · surah ${bs.idx} of ${bs.n}${Q.list[0] ? ": " + esc(surahName(Q.list[0])) : ""}`;
+  const libProgSub = bs => `${T("{done} of {total}", { done: fmt(bs.done), total: fmt(bs.tot) })} · ${T("surah {i} of {total}", { i: bs.idx, total: bs.n })}${Q.list[0] ? ": " + esc(surahName(Q.list[0])) : ""}`;
   function openLib() {
     api.closePops(); libFrom = document.activeElement; lib().hidden = false; closeMini(); refreshFree(); renderLib(); const x = $("#olClose"); x && x.focus({ preventScroll: true });
     api.stat("open_panel", { panel: "offline_library" });
@@ -408,18 +414,18 @@ window.GQOff = (() => {
   function done() { const wasV = VS.open; VS.open = false; closeMini(); if (wasV) { const b = $("#offlib [data-oa=vopen]"); if (b) { b.focus({ preventScroll: true }); miniFrom = null; return; } } if (miniFrom && miniFrom.focus && document.contains(miniFrom)) miniFrom.focus({ preventScroll: true }); miniFrom = null; }
   function askListen(then) {
     const rd = readMB(api.cur()), au = api.voices().reduce((a, v) => a + voiceMB(api.cur(), v), 0);
-    mini(`<h4>Listen offline too?</h4><p>Saved surahs open with no internet. Do you also want the recitation?</p>
-      <div class="op-opts"><button type="button" class="opt ${ST.listen ? "" : "on"}" data-oa="ls0"><i class="rd"></i><span><b>Read only</b><small>Arabic and your translation</small></span></button>
-      <button type="button" class="opt ${ST.listen ? "on" : ""}" data-oa="ls1"><i class="rd"></i><span><b>Read and listen<span class="tag">Suggested</span></b><small>Plus the recitation by ${listenHtml()}</small></span></button></div>
-      <p class="op-note">${ic("sel")}Asked once. Change it any time in the Offline library.</p>
-      <div class="om-btns"><button type="button" class="ob" data-oa="mclose">Not now</button><button type="button" class="ob pri" data-oa="asked">Continue</button></div>`, { ls0: () => { ST.listen = false; save(); askListen(then); }, ls1: () => { ST.listen = true; save(); askListen(then); }, asked: () => { ST.asked = true; save(); done(); then && then(); emit(); } });
+    mini(`<h4>${T("Listen offline too?")}</h4><p>${T("Saved surahs open with no internet. Do you also want the recitation?")}</p>
+      <div class="op-opts"><button type="button" class="opt ${ST.listen ? "" : "on"}" data-oa="ls0"><i class="rd"></i><span><b>${T("Read only")}</b><small>${T("Arabic and your translation")}</small></span></button>
+      <button type="button" class="opt ${ST.listen ? "on" : ""}" data-oa="ls1"><i class="rd"></i><span><b>${T("Read and listen")}<span class="tag">${T("Suggested")}</span></b><small>${T("Plus the recitation by {voices}", { voices: listenHtml() })}</small></span></button></div>
+      <p class="op-note">${ic("sel")}${T("Asked once. Change it any time in the Offline library.")}</p>
+      <div class="om-btns"><button type="button" class="ob" data-oa="mclose">${T("Not now")}</button><button type="button" class="ob pri" data-oa="asked">${T("Continue")}</button></div>`, { ls0: () => { ST.listen = false; save(); askListen(then); }, ls1: () => { ST.listen = true; save(); askListen(then); }, asked: () => { ST.asked = true; save(); done(); then && then(); emit(); } });
   }
   function menu(n) {
     const r = ST.s[n], hasA = Object.keys((r && r.a) || {}).length, m = missing(n), mis = !isComplete(n);
-    mini(`<h4>${esc(surahName(n))} is ready offline</h4><p>${fmt(sizeOf(n))} on this device. ${hasA ? "Reads and plays" : "Reads"} with no internet.</p><div class="om-list">
-      ${mis ? `<button type="button" class="ob wide pri" data-oa="upd" data-n="${n}">${ic("ear")}${m.voices.length && !m.text.length ? "Add listening" : "Update"} · ${fmt(costOf(n))}</button>` : ""}
-      ${hasA ? `<button type="button" class="ob wide" data-oa="rml" data-n="${n}">${ic("ear")}Remove listening only · frees ${fmt(Object.values(r.a).reduce((a, x) => a + x, 0))}</button>` : ""}
-      <button type="button" class="ob wide dng" data-oa="rm" data-n="${n}">${ic("trash")}Remove from this device</button><button type="button" class="ob wide" data-oa="mclose">Keep it</button></div>`);
+    mini(`<h4>${T("{name} is ready offline", { name: esc(surahName(n)) })}</h4><p>${T("{size} on this device.", { size: fmt(sizeOf(n)) })} ${hasA ? T("Reads and plays with no internet.") : T("Reads with no internet.")}</p><div class="om-list">
+      ${mis ? `<button type="button" class="ob wide pri" data-oa="upd" data-n="${n}">${ic("ear")}${m.voices.length && !m.text.length ? T("Add listening") : T("Update")} · ${fmt(costOf(n))}</button>` : ""}
+      ${hasA ? `<button type="button" class="ob wide" data-oa="rml" data-n="${n}">${ic("ear")}${T("Remove listening only · frees {size}", { size: fmt(Object.values(r.a).reduce((a, x) => a + x, 0)) })}</button>` : ""}
+      <button type="button" class="ob wide dng" data-oa="rm" data-n="${n}">${ic("trash")}${T("Remove from this device")}</button><button type="button" class="ob wide" data-oa="mclose">${T("Keep it")}</button></div>`);
   }
   async function startList(list, opts = {}) {
     list = list.filter(n => !isComplete(n) && !Q.list.includes(n)); if (!list.length) return;
@@ -427,14 +433,14 @@ window.GQOff = (() => {
     const cost = costList(list); await refreshFree();
     if (FREE != null && cost > FREE * .9) {
       const ro = ST.listen ? list.reduce((a, n) => a + (isReady(n) ? 0 : readMB(n)), 0) : 0;
-      return mini(`<div class="om-h">${ic("alert", "err")}<div><h4>Not enough space</h4><p>This needs ${fmt(cost)} and about ${fmt(FREE)} is free. ${ST.listen ? "Choose Read only, or fewer surahs." : "Choose fewer surahs."}</p></div></div><div class="om-btns"><button type="button" class="ob" data-oa="mclose">Choose surahs</button>${ST.listen && ro && ro < FREE * .9 ? `<button type="button" class="ob pri" data-oa="ro">Read only · ${fmt(ro)}</button>` : ""}</div>`, { ro: () => { ST.listen = false; save(); done(); enqueue(list); } });
+      return mini(`<div class="om-h">${ic("alert", "err")}<div><h4>${T("Not enough space")}</h4><p>${T("This needs {size} and about {free} is free.", { size: fmt(cost), free: fmt(FREE) })} ${ST.listen ? T("Choose Read only, or fewer surahs.") : T("Choose fewer surahs.")}</p></div></div><div class="om-btns"><button type="button" class="ob" data-oa="mclose">${T("Choose surahs")}</button>${ST.listen && ro && ro < FREE * .9 ? `<button type="button" class="ob pri" data-oa="ro">${T("Read only")} · ${fmt(ro)}</button>` : ""}</div>`, { ro: () => { ST.listen = false; save(); done(); enqueue(list); } });
     }
     if (cost > 300 && !opts.sure) {
       const ro = list.reduce((a, n) => a + (isReady(n) ? 0 : readMB(n)), 0);
-      return mini(`<h4>Save ${list.length} surah${list.length > 1 ? "s" : ""}?</h4><p>${ST.listen ? "Arabic, translation, page fonts and the recitation." : "Arabic, translation and page fonts."}</p>
-        <div class="op-line"><span><b>Download</b></span><em>${fmt(cost)}</em></div>${FREE != null ? `<div class="op-line"><span><b>Free on this device</b></span><em>${fmt(FREE)}</em></div>` : ""}
-        <p class="op-note">${ic("wifi")}This is a large download. Wi-Fi is best. It pauses if the connection drops and carries on without repeating files.</p>
-        <div class="om-list"><button type="button" class="ob wide pri" data-oa="sure">${ic("cloud")}${ST.listen ? "Read and listen" : "Read only"} · ${fmt(cost)}</button>${ST.listen ? `<button type="button" class="ob wide" data-oa="ro">Read only · ${fmt(ro)}</button>` : ""}<button type="button" class="ob wide" data-oa="mclose">Not now</button></div>`,
+      return mini(`<h4>${TN(list.length, "Save {n} surah?", "Save {n} surahs?")}</h4><p>${ST.listen ? T("Arabic, translation, page fonts and the recitation.") : T("Arabic, translation and page fonts.")}</p>
+        <div class="op-line"><span><b>${T("Download")}</b></span><em>${fmt(cost)}</em></div>${FREE != null ? `<div class="op-line"><span><b>${T("Free on this device")}</b></span><em>${fmt(FREE)}</em></div>` : ""}
+        <p class="op-note">${ic("wifi")}${T("This is a large download. Wi-Fi is best. It pauses if the connection drops and carries on without repeating files.")}</p>
+        <div class="om-list"><button type="button" class="ob wide pri" data-oa="sure">${ic("cloud")}${ST.listen ? T("Read and listen") : T("Read only")} · ${fmt(cost)}</button>${ST.listen ? `<button type="button" class="ob wide" data-oa="ro">${T("Read only")} · ${fmt(ro)}</button>` : ""}<button type="button" class="ob wide" data-oa="mclose">${T("Not now")}</button></div>`,
         { sure: () => { done(); enqueue(list); SEL.clear(); emit(); }, ro: () => { ST.listen = false; save(); done(); enqueue(list); SEL.clear(); emit(); } });
     }
     enqueue(list); SEL.clear(); emit();
@@ -453,15 +459,15 @@ window.GQOff = (() => {
       case "vopen": voiceSheet(); return;
       case "vtab": VS.tab = k; VS.q = ""; $("#ovQ").value = ""; vsRender(); return;
       case "vpick": (t.dataset.t === "q" ? api.setReciter : api.setTrRec)(k); vsRender(); break;
-      case "vrm": { const id = k, c = voiceCount(id); mini(`<h4>Remove ${vh(api.voiceName(id), api.voiceNative(id))}?</h4><p>Its recitation is removed from ${c} surah${c === 1 ? "" : "s"} (${fmt(voiceOnDevice(id))}). They still read offline, and you can add it again any time.</p><div class="om-btns"><button type="button" class="ob" data-oa="mclose">Keep it</button><button type="button" class="ob dng" data-oa="vrmy">Remove</button></div>`, { vrmy: () => { done(); removeVoice(id).then(() => api.toast("Removed " + api.voiceName(id))); } }); return; }
+      case "vrm": { const id = k, c = voiceCount(id); mini(`<h4>${T("Remove {voice}?", { voice: vh(api.voiceName(id), api.voiceNative(id)) })}</h4><p>${TN(c, "Its recitation is removed from {n} surah ({size}). It still reads offline, and you can add it again any time.", "Its recitation is removed from {n} surahs ({size}). They still read offline, and you can add it again any time.", { size: fmt(voiceOnDevice(id)) })}</p><div class="om-btns"><button type="button" class="ob" data-oa="mclose">${T("Keep it")}</button><button type="button" class="ob dng" data-oa="vrmy">${T("Remove")}</button></div>`, { vrmy: () => { done(); removeVoice(id).then(() => api.toast(T("Removed {voice}", { voice: api.voiceName(id) }))); } }); return; }
       case "lsw": { ST.listen = !ST.listen; save(); const upd = needUpdate(); if (ST.listen && upd.length) { /* the banner offers the recitation */ } break; }
-      case "auto": ST.auto = !ST.auto; save(); if (ST.auto) api.toast("New surahs you read will save on Wi-Fi"); break;
+      case "auto": ST.auto = !ST.auto; save(); if (ST.auto) api.toast(T("New surahs you read will save on Wi-Fi")); break;
       case "save": ST.asked = true; save(); startList([n]); api.closePops(); break;
       case "upd": done(); startList([n]); break; case "updall": startList(needUpdate()); break;
       case "pause": pause(); break; case "resume": resume(); break; case "cancel": cancel(); break; case "unq": dequeue(n); break;
-      case "rm": done(); removeSurah(n).then(() => api.toast("Removed from this device")); break;
-      case "rml": done(); removeListening(n).then(() => api.toast("Listening removed")); break;
-      case "rmall": mini(`<h4>Remove everything?</h4><p>All ${nReady()} saved surahs (${fmt(onDevice())}) are removed from this device. You can save them again any time.</p><div class="om-btns"><button type="button" class="ob" data-oa="mclose">Keep them</button><button type="button" class="ob dng" data-oa="rmy">Remove all</button></div>`, { rmy: () => { done(); removeAll().then(() => api.toast("Removed from this device")); } }); break;
+      case "rm": done(); removeSurah(n).then(() => api.toast(T("Removed from this device"))); break;
+      case "rml": done(); removeListening(n).then(() => api.toast(T("Listening removed"))); break;
+      case "rmall": mini(`<h4>${T("Remove everything?")}</h4><p>${TN(nReady(), "{n} saved surah ({size}) is removed from this device. You can save it again any time.", "All {n} saved surahs ({size}) are removed from this device. You can save them again any time.", { size: fmt(onDevice()) })}</p><div class="om-btns"><button type="button" class="ob" data-oa="mclose">${T("Keep them")}</button><button type="button" class="ob dng" data-oa="rmy">${T("Remove all")}</button></div>`, { rmy: () => { done(); removeAll().then(() => api.toast(T("Removed from this device"))); } }); break;
       case "menu": menu(n); break;
       case "tick": SEL.has(n) ? SEL.delete(n) : SEL.add(n); break; case "tq": if (Q.list[0] === n) (Q.run ? pause() : resume()); else dequeue(n); break;
       case "pick": SEL.clear(); (k === "all" ? allN().filter(x => !isComplete(x)) : allN().filter(x => !isComplete(x) && (ST.s[x] || Q.list.includes(x) || touched(x)))).forEach(x => SEL.add(x)); break;
@@ -506,7 +512,7 @@ window.GQOff = (() => {
     renderBtn(); renderList(); renderDock(); renderPop();
     const bs = batchStats(), n = Q.list[0]; if (!libOpen() || !bs || bs.complete) return;
     const set = (sel, v) => { const x = $(sel); if (x && x.textContent !== v) x.textContent = v; };
-    set("[data-d=lp1]", `${Q.run ? "Downloading" : "Paused"} · ${Math.round(bs.done / bs.tot * 100)}%`); set("[data-d=lp2]", libProgSub(bs)); set("[data-d=lf1]", `Saving ${bs.idx} of ${bs.n}`);
+    set("[data-d=lp1]", `${Q.run ? T("Downloading") : T("Paused")} · ${pc(Math.round(bs.done / bs.tot * 100))}`); set("[data-d=lp2]", libProgSub(bs)); set("[data-d=lf1]", T("Saving {i} of {total}", { i: bs.idx, total: bs.n }));
     const bar = $("[data-d=lpb]"); if (bar) bar.style.width = bs.done / bs.tot * 100 + "%";
     const old = n && $(`#olGrid [data-n="${n}"]`); if (old) { const tmp = document.createElement("div"); tmp.innerHTML = tile(n); old.replaceWith(tmp.firstChild); }
   }
@@ -545,7 +551,7 @@ window.GQOff = (() => {
 
   return {
     attach, get supported() { return supported; }, renderPop: () => { refreshFree(); renderPop(); }, onSurah, rows: () => { api && emit(); }, modalOpen: () => libOpen() || miniOpen(), closeLib,
-    rowHtml: n => supported ? `<button type="button" class="og" data-og="${n}" aria-label="Save for offline"></button>` : "",
+    rowHtml: n => supported ? `<button type="button" class="og" data-og="${n}" aria-label="${T("Save for offline")}"></button>` : "",
     status: n => state(n),
     ready: () => Object.keys(ST.s).map(Number).filter(isReady).sort((x, y) => x - y)   // surahs whose reading part is saved (they open with no connection)
   };

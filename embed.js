@@ -12,13 +12,15 @@
  *   data-height      px, default 720                                        data-sidebar  1 = show the surah list (needs ≥ 1100px width)
  *   data-translation any Global Quran translation id, e.g. en.sahih, fr.hamidullah, ur.jalandhry (several: "en.sahih,ur.jalandhry"), or none
  *   data-theme       day | night | auto (follows the visitor's system)      data-accent   hex colour, no #
+ *   data-lang        language of the reader, e.g. en, ar, ur, fr (default: the visitor's browser language). It picks the menus, translation and voice
+ *                    unless data-translation says otherwise; the visitor can change it with the language button
  *   data-player      0 hides the audio player                               data-font     mushaf | amiri | me
  *   data-login       0 turns off the "keep your saved verses on every device" sign-in prompt (saved verses then stay on the visitor's device)
  *   data-api-key     your Global Quran API key (free: docs.globalquran.com). Optional for now; one key per site lets you see your own usage. The frame also
  *                    tells the API which site embeds it, so the usage is listed under your site.
  *   data-api-url     use another API base URL (default https://api.globalquran.com)
  *
- * JavaScript API on the element:  el.globalquran.goto(36, 12)  .setTheme("night")  .setTranslation("en.sahih")  .play(5)  .pause()
+ * JavaScript API on the element:  el.globalquran.goto(36, 12)  .setTheme("night")  .setTranslation("en.sahih")  .setLanguage("ur")  .play(5)  .pause()
  * Events on the element (bubbling): globalquran:ready   globalquran:ayah  (detail.surah, detail.ayah)
  */
 (function () {
@@ -28,7 +30,7 @@
   function mount(el) {
     if (el.__gq) return; el.__gq = true;
     var d = el.dataset, q = ["embed=1", "from=" + encodeURIComponent(location.hostname)];
-    [["surah", "surah"], ["ayah", "ayah"], ["theme", "theme"], ["accent", "accent"], ["font", "font"], ["sidebar", "sidebar"], ["player", "player"], ["login", "login"]].forEach(function (p) {
+    [["surah", "surah"], ["ayah", "ayah"], ["theme", "theme"], ["accent", "accent"], ["font", "font"], ["sidebar", "sidebar"], ["player", "player"], ["login", "login"], ["lang", "lang"]].forEach(function (p) {
       if (d[p[0]] != null && d[p[0]] !== "") q.push(p[1] + "=" + encodeURIComponent(d[p[0]]));
     });
     if (d.translation) q.push("tr=" + encodeURIComponent(d.translation === "none" ? "" : d.translation));
@@ -55,6 +57,7 @@
       goto: function (surah, ayah) { send({ type: "goto", surah: surah, ayah: ayah || 1 }); },
       setTheme: function (t) { send({ type: "theme", value: t }); },
       setTranslation: function (id) { send({ type: "translation", value: id === "none" ? "" : id }); },
+      setLanguage: function (code) { send({ type: "language", value: code }); },
       play: function (ayah) { send({ type: "play", ayah: ayah }); },
       pause: function () { send({ type: "play", value: false }); },
       iframe: f

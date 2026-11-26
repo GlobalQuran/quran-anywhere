@@ -94,6 +94,7 @@ Every option is an attribute on the `div`. All are optional. See [`embed-demo.ht
 | `data-sidebar` | `1` shows the surah list (needs 1100px+) |
 | `data-translation` | any translation id (`en.sahih`, `fr.hamidullah`, `ur.jalandhry`…), several with commas, or `none` |
 | `data-theme` | `day`, `night`, `auto` |
+| `data-lang` | menus, translation and voice in one language (`ur`, `fr`, `id`…). Without it the visitor's browser language is used |
 | `data-accent` | hex colour, no `#` |
 | `data-player` | `0` hides the audio player |
 | `data-font` | `mushaf`, `amiri`, `me` |
@@ -106,6 +107,7 @@ const book = document.querySelector(".globalquran-book").globalquran;
 book.goto(36, 12);
 book.setTheme("night");
 book.setTranslation("en.sahih");
+book.setLanguage("ur");           // menus, translation and voice (reloads the reader)
 book.play(5);
 book.pause();
 ```
@@ -118,6 +120,7 @@ Listen for `globalquran:ready` and `globalquran:ayah` (`event.detail.surah`, `ev
 - **Mushaf text with tajweed colours** (with a colour key), plus Amiri Quran and other Arabic fonts, and calligraphic surah titles.
 - **95 translations, any number at once,** plus transliteration and word-by-word meanings.
 - **Audio that keeps going:** pick a reciter and a translation voice, set speed and repeat, and it plays on from surah to surah through to the end of the Quran. Tap any verse number to play from there. Eye button flips between Listen and reading views.
+- **Your reader's language.** It follows the browser's language: menus (29 languages, right to left where needed), numbers in the language's own digits, a translation and, where there is one, a translation voice. A reader can change it at any time. See [Languages](#languages).
 - **Day / night / system theme,** text size, and it remembers where you were. The browser tab title always shows the verse (`2:255 Al-Baqarah`).
 - **Links that work everywhere:** `#2:255` on any host, or clean `/2:255` paths where you can rewrite URLs.
 - **Accessible:** keyboard shortcuts (press `?`), screen-reader labels, reduced-motion and high-contrast support, WCAG AA contrast.
@@ -132,11 +135,13 @@ Set these in a `<script>` **before** `app.js` (or pass them as `?query` paramete
 | `window.GQ_BASE = "/quran/"` | Folder the app lives in, for path links. Worked out automatically if not set. |
 | `window.GQ_TRANSLATIONS = "en.sahih,ur.jalandhry"` | Default translations for a visitor's **first** visit (their own choice wins afterwards). |
 | `window.GQ_TABS = "top" \| "side" \| "none"` | Where the mode tabs (Read, Understand, Listen, Memorise) sit on the book. `top` is the default; `none` hides them and shows a Mode menu in the options bar instead. A visitor's own choice (Settings > Mode tabs) wins afterwards, and `?tabs=` overrides both. |
+| `window.GQ_LANG = "ur"` | The language for a visitor who has not chosen one (it wins over the browser's). `?lang=ur` in the address wins over this. |
+| `window.GQ_LANG_PATHS = true` | Recognise language addresses (`/ur`, `/ur/2:255`) on your host. Needs the same rewrite as clean links. Off elsewhere, so a copy in a folder called `/de/` keeps working. |
 | `window.GQ_API_KEY = "…"` | Your API key, if you have one (`?key=`). |
 | `window.GQ_API_URL = "…"` | Use another API base (`?api=`). |
 | `window.GQ_ASSETS = "…"` | Where mushaf glyph data and page fonts load from (default: the Global Quran CDN). |
 
-Other query parameters: `?theme=night`, `?tr=en.sahih`, `?font=amiri`, `?tabs=top|side|none`, `?bg=1|2|3|4` (the Listen background: Girih, Ripples, Night sky, Aurora; Ripples by default), `?player=0`, `?sidebar=1`. Shared links carry `?m=both|ar|tr|listen&t=<translation>` and, for `listen`, `&l=ar|both|tr&r=<reciter>&v=<translation voice>`: opening one shows the Listen stage with the same voices and starts the recitation at that verse (browsers that refuse sound until a tap wait for the first tap). Embeds and `?embed=1` never touch the address bar.
+Other query parameters: `?lang=ur`, `?digits=latn` (0-9 instead of the language's own digits), `?theme=night`, `?tr=en.sahih`, `?font=amiri`, `?tabs=top|side|none`, `?bg=1|2|3|4` (the Listen background: Girih, Ripples, Night sky, Aurora; Ripples by default), `?player=0`, `?sidebar=1`. Shared links carry `?m=both|ar|tr|listen&t=<translation>` and, for `listen`, `&l=ar|both|tr&r=<reciter>&v=<translation voice>`: opening one shows the Listen stage with the same voices and starts the recitation at that verse (browsers that refuse sound until a tap wait for the first tap). Embeds and `?embed=1` never touch the address bar.
 
 <details>
 <summary><strong>Clean <code>/2:255</code> links (optional)</strong></summary>
@@ -167,6 +172,15 @@ This repository used to be `GlobalQuran/site`; old links redirect here. If you r
 
 </details>
 
+## Languages
+
+The reader picks the first of these: the language the visitor chose, the one in the address (`/ur/2:255` or `?lang=ur`), `window.GQ_LANG`, the browser's language list, English. Arabic readers get the Quran with the recitation and no translation.
+
+- `lang/languages.js` lists every language: its names, default translation and voice, writing direction, digits.
+- `lang/<code>.js` holds the menu words, as `window.GQ_STRINGS = { "English text": "translation" }`. A plural is `{ "one": "…", "other": "…" }` (the categories of `Intl.PluralRules`); keep `{name}` placeholders. A missing line shows in English.
+- To add a menu language: copy an existing file in `lang/`, translate the right-hand sides, set `"menus": 1` for the language in `lang/languages.js`, and bump `VER` in `i18n.js`.
+- To fix a translation of the menus, edit its line and send a pull request.
+
 ## Where the data comes from
 
 | What | Source |
@@ -185,6 +199,8 @@ index.html   page shell and every dialog
 app.css      all styling (day and night)
 app.js       the reader
 gq-api.js    API client (caching, errors)
+i18n.js      languages: which one, menu words, native digits
+lang/        language list and menu words
 embed.js     the two-line embed
 data/        small local data (surah list, page table)
 fonts/ img/  fonts, frame, icons

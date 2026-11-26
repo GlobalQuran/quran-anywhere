@@ -2,9 +2,9 @@
    Uses the reader's own tokens (paper, gold, controls) so day and night both work. */
 .sg-card { position: fixed; z-index: 200; width: min(280px, calc(100vw - 20px)); background: var(--paper-c); color: var(--head); border: 1px solid var(--line); border-radius: 14px; padding: 14px 15px 13px; box-shadow: 0 14px 34px rgba(0,0,0,.28); font: 13px/1.4 var(--ui); display: flex; flex-direction: column; gap: 8px; animation: pop-in .18s var(--ease); }
 .sg-card[hidden] { display: none; }
-.sg-card h3 { margin: 0; padding-right: 22px; font: 700 14px var(--ui); color: var(--ink); }
+.sg-card h3 { margin: 0; padding-inline-end: 22px; font: 700 14px var(--ui); color: var(--ink); }
 .sg-card p { margin: 0; color: var(--tr-ink); font-size: 12.5px; }
-.sg-x { position: absolute; right: 6px; top: 5px; width: 28px; height: 28px; border: 0; border-radius: 8px; background: none; color: var(--tr-ink); font-size: 19px; line-height: 1; }
+.sg-x { position: absolute; inset-inline-end: 6px; top: 5px; width: 28px; height: 28px; border: 0; border-radius: 8px; background: none; color: var(--tr-ink); font-size: 19px; line-height: 1; }
 .sg-x:hover { background: var(--ctl-hover); }
 .sg-b { display: flex; align-items: center; justify-content: center; gap: 8px; height: 36px; border-radius: 18px; border: 1px solid #d0d0d0; background: #fff; color: #1f1f1f; font: 600 13px var(--ui); transition: filter var(--t), transform var(--t); }
 .sg-b:hover { filter: brightness(.96); } .sg-b:active { transform: scale(.98); }
